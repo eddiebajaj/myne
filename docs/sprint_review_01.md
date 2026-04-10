@@ -236,6 +236,23 @@ Several times I had to re-explain decisions to new agents because I hadn't docum
 - [ ] Include a "visual verification checklist" in commit messages for UI changes
 - [ ] Resolve bash permission issue for sub-agents (user to enable skip-permissions)
 
+## Retrospective — User (Eddie Bajaj) / Stakeholder
+
+### What went well
+- _[To be filled by Eddie]_
+
+### What needs improvement
+- Touch controls went through 3+ iterations and still weren't working on mobile — virtual pad never appeared on phone web build
+- _[More to be filled by Eddie]_
+
+### What surprised me
+- _[To be filled by Eddie]_
+
+### What I want to see next sprint
+- _[To be filled by Eddie]_
+
+---
+
 ## Action Items for Next Sprint
 - [ ] Fix touch controls for mobile web play
 - [ ] Playtest the mine loop and gather feedback
