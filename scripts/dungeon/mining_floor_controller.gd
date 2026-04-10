@@ -9,6 +9,8 @@ extends Node2D
 
 
 func _ready() -> void:
+	# Ensure game is not paused (in case we came from a paused build menu)
+	get_tree().paused = false
 	player.add_to_group("player")
 	# Position player near stairs up
 	player.position = Vector2(120, 120)

@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3 uid="uid://mining_floor_scene"]
+[gd_scene load_steps=6 format=3 uid="uid://mining_floor_scene"]
 
 [ext_resource type="Script" path="res://scripts/dungeon/mining_floor_controller.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/dungeon/floor_generator.gd" id="2"]
@@ -32,8 +32,10 @@ position = Vector2(120, 120)
 script = ExtResource("5")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
+process_mode = 3
 
 [node name="MiningHUD" type="Control" parent="CanvasLayer"]
+process_mode = 3
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -45,14 +47,11 @@ script = ExtResource("4")
 [node name="FloorLabel" type="Label" parent="CanvasLayer/MiningHUD"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -100
+anchors_preset = 0
+offset_left = 10
 offset_top = 8
-offset_right = 100
+offset_right = 200
 offset_bottom = 28
-horizontal_alignment = 1
 
 [node name="BackpackBar" type="ProgressBar" parent="CanvasLayer/MiningHUD"]
 unique_name_in_owner = true
@@ -82,24 +81,20 @@ vertical_alignment = 1
 [node name="HealthBar" type="ProgressBar" parent="CanvasLayer/MiningHUD"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -220
+anchors_preset = 0
+offset_left = 10
 offset_top = 32
-offset_right = -10
+offset_right = 180
 offset_bottom = 50
 show_percentage = false
 
 [node name="HealthLabel" type="Label" parent="CanvasLayer/MiningHUD"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -220
+anchors_preset = 0
+offset_left = 10
 offset_top = 32
-offset_right = -10
+offset_right = 180
 offset_bottom = 50
 horizontal_alignment = 1
 vertical_alignment = 1
@@ -107,33 +102,34 @@ vertical_alignment = 1
 [node name="ArmorLabel" type="Label" parent="CanvasLayer/MiningHUD"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -220
+anchors_preset = 0
+offset_left = 10
 offset_top = 52
-offset_right = -10
+offset_right = 180
 offset_bottom = 68
-horizontal_alignment = 1
 visible = false
 
 [node name="BatteryLabel" type="Label" parent="CanvasLayer/MiningHUD"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
 offset_left = 10
-offset_top = 10
-offset_right = 150
-offset_bottom = 28
+offset_top = -48
+offset_right = 200
+offset_bottom = -30
 
 [node name="ArtifactLabel" type="Label" parent="CanvasLayer/MiningHUD"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
 offset_left = 10
-offset_top = 30
+offset_top = -28
 offset_right = 350
-offset_bottom = 48
+offset_bottom = -10
 visible = false
 
 [node name="FullWarning" type="Label" parent="CanvasLayer/MiningHUD"]

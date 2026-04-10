@@ -1,7 +1,8 @@
 class_name FloorGenerator
 extends Node2D
-## Generates a single dungeon floor — open room with ore nodes, stairs, caves, portals.
-## Ore spawns are tier-gated by depth. ~20-30% of nodes get a mineral modifier.
+## Generates a single dungeon floor — open room with ore nodes, rocks, stairs, caves, portals.
+## Ore spawns are tier-gated by depth. ~25% of nodes get a mineral modifier.
+## Rocks hide stairs down (1 rock), treasure (1-2 rocks), rest are empty.
 
 const FLOOR_WIDTH := 800.0
 const FLOOR_HEIGHT := 600.0
@@ -14,6 +15,8 @@ var ore_node_scene: PackedScene
 var portal_scene: PackedScene
 var cave_scene: PackedScene
 var stairs_scene: PackedScene
+var rock_scene: PackedScene
+var floor_time: float = 0.0  # Track time on floor for rock portal trigger
 
 @onready var walls: Node2D = $Walls
 @onready var ore_container: Node2D = $OreNodes
@@ -27,13 +30,20 @@ func _ready() -> void:
 	generate_floor()
 
 
+func _process(delta: float) -> void:
+	floor_time += delta
+
+
 func generate_floor() -> void:
+	floor_time = 0.0
 	_create_walls()
 	_spawn_ore_nodes()
-	_spawn_stairs()
+	_spawn_stairs_up()
+	_spawn_rocks()
 	if randf() < GameManager.get_cave_chance():
 		_spawn_cave()
-	if randf() < GameManager.get_portal_chance():
+	# Portal spawner for B3F+
+	if GameManager.current_floor >= 3:
 		_spawn_portal()
 
 
@@ -43,7 +53,7 @@ func _spawn_ore_nodes() -> void:
 	var density := GameManager.get_ore_density()
 	var count := int(12 * density) + randi_range(-2, 3)
 	for i in range(count):
-		var ore := _pick_ore_for_depth()
+		var ore := pick_ore_for_depth()
 		if ore == null:
 			continue
 		var mineral: MineralData = null
@@ -64,7 +74,7 @@ func spawn_ore_node_at(pos: Vector2, ore: OreData, mineral: MineralData = null) 
 	ore_container.add_child(node)
 
 
-func _pick_ore_for_depth() -> OreData:
+func pick_ore_for_depth() -> OreData:
 	var floor_num := GameManager.current_floor
 	var valid: Array[OreData] = []
 	var total_weight := 0.0
@@ -98,15 +108,75 @@ func get_rare_ores() -> Array[OreData]:
 
 # === Stairs ===
 
-func _spawn_stairs() -> void:
+func _spawn_stairs_up() -> void:
+	## Stairs up are always visible from the start.
 	var up: Area2D = stairs_scene.instantiate()
 	up.stair_type = Stairs.StairType.UP
 	up.position = Vector2(80, 80)
 	entities.add_child(up)
+
+
+func spawn_stairs_down_at(pos: Vector2) -> void:
+	## Called when a rock hiding stairs is broken.
 	var down: Area2D = stairs_scene.instantiate()
 	down.stair_type = Stairs.StairType.DOWN
-	down.position = Vector2(FLOOR_WIDTH - 80, FLOOR_HEIGHT - 80)
+	down.position = pos
 	entities.add_child(down)
+
+
+# === Rocks (from 13_balance_t1.md section 5b) ===
+
+func _spawn_rocks() -> void:
+	## 8-12 rocks per floor. 1 hides stairs down, 1-2 hide treasure, rest are empty.
+	var total_rocks := randi_range(8, 12)
+	var treasure_count := randi_range(1, 2)
+	# Assign rock types
+	var rock_types: Array[String] = []
+	rock_types.append("stairs")
+	for i in range(treasure_count):
+		rock_types.append("treasure")
+	while rock_types.size() < total_rocks:
+		rock_types.append("empty")
+	# Shuffle
+	rock_types.shuffle()
+	# Spawn rocks spread across the floor
+	for i in range(rock_types.size()):
+		var pos := _random_floor_position(50.0)
+		var rock: StaticBody2D = rock_scene.instantiate()
+		rock.global_position = pos
+		rock.rock_content = rock_types[i]
+		rock.floor_generator = self
+		ore_container.add_child(rock)
+
+
+# === Rock portal trigger chance (from 13_balance_t1.md section 4c) ===
+
+func get_rock_portal_chance() -> float:
+	## Returns the chance (0.0-1.0) that breaking a rock triggers a portal.
+	var floor_num := GameManager.current_floor
+	if floor_num < 3:
+		return 0.0
+	# Base chance: 5% at B3F, +2.5% per floor
+	var base := 0.05 + (floor_num - 3) * 0.025
+	# Time bonus: +0.1% per second, cap 10%
+	var time_bonus := minf(floor_time * 0.001, 0.10)
+	# Ore bonus: +0.25% per ore, cap 8%
+	var ore_bonus := minf(Inventory.get_used_slots() * 0.0025, 0.08)
+	# Mineral ore bonus: +2% per mineral piece
+	var mineral_bonus := 0.0
+	for slot in Inventory.get_ore_stacks():
+		if slot.mineral != null:
+			mineral_bonus += slot.quantity * 0.02
+	return base + time_bonus + ore_bonus + mineral_bonus
+
+
+func spawn_rock_triggered_portal(pos: Vector2) -> void:
+	## Rock-triggered portal: shorter warning (1.5s), spawns a single wave.
+	var portal: Node2D = portal_scene.instantiate()
+	portal.position = pos + Vector2(randf_range(-40, 40), randf_range(-40, 40))
+	# Override to rock-triggered behavior
+	portal.set_meta("rock_triggered", true)
+	entities.add_child(portal)
 
 
 # === Cave ===
@@ -144,10 +214,12 @@ func _random_enemy() -> EnemyData:
 		1:
 			if randf() < 0.5:
 				e.id = "cave_beetle"; e.display_name = "Cave Beetle"; e.color = Color(0.4, 0.3, 0.2)
-				e.health = 15.0; e.damage = 3.0; e.move_speed = 70.0
+				e.health = 12.0; e.damage = 5.0; e.move_speed = 90.0
+				e.attack_range = 28.0; e.attack_speed = 0.8; e.aggro_range = 180.0; e.leash_range = 300.0
 			else:
 				e.id = "tunnel_rat"; e.display_name = "Tunnel Rat"; e.color = Color(0.5, 0.4, 0.3)
-				e.health = 10.0; e.damage = 4.0; e.move_speed = 90.0
+				e.health = 6.0; e.damage = 3.0; e.move_speed = 110.0
+				e.attack_range = 24.0; e.attack_speed = 1.2; e.aggro_range = 160.0; e.leash_range = 250.0
 		2:
 			if randf() < 0.5:
 				e.id = "rock_crab"; e.display_name = "Rock Crab"; e.color = Color(0.6, 0.5, 0.4)
@@ -169,7 +241,6 @@ func _random_enemy() -> EnemyData:
 			else:
 				e.id = "deep_wurm"; e.display_name = "Deep Wurm"; e.color = Color(0.4, 0.3, 0.5)
 				e.health = 80.0; e.damage = 15.0; e.move_speed = 60.0
-	e.attack_range = 28.0; e.aggro_range = 180.0; e.attack_speed = 1.0
 	return e
 
 
@@ -240,6 +311,7 @@ func _build_scenes() -> void:
 	stairs_scene = _build_stairs_scene()
 	cave_scene = _build_cave_scene()
 	portal_scene = _build_portal_scene()
+	rock_scene = _build_rock_scene()
 
 
 func _build_ore_node_scene() -> PackedScene:
@@ -273,6 +345,28 @@ func _build_ore_node_scene() -> PackedScene:
 	bar.position = Vector2(-15, -22)
 	bar.show_percentage = false; bar.visible = false
 	root.add_child(bar); bar.owner = root
+	scene.pack(root)
+	return scene
+
+
+func _build_rock_scene() -> PackedScene:
+	var scene := PackedScene.new()
+	var root := StaticBody2D.new()
+	root.name = "Rock"
+	root.set_script(load("res://scripts/dungeon/rock.gd"))
+	root.collision_layer = 2  # Same as ore nodes so pickaxe hits them
+	root.collision_mask = 0
+	var rect := ColorRect.new()
+	rect.name = "Sprite"
+	rect.size = Vector2(28, 28)
+	rect.position = Vector2(-14, -14)
+	rect.color = Color(0.4, 0.35, 0.3)
+	root.add_child(rect); rect.owner = root
+	var col := CollisionShape2D.new()
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(28, 28)
+	col.shape = shape
+	root.add_child(col); col.owner = root
 	scene.pack(root)
 	return scene
 

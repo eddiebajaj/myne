@@ -221,6 +221,8 @@ func begin_run() -> void:
 	follower_bots.clear()
 	checkpoint_bots.clear()
 	artifacts.clear()
+	# Start each run with 3 batteries for testing
+	batteries = 3
 	inventory_changed.emit()
 	bots_changed.emit()
 

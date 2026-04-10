@@ -48,10 +48,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _open_build_step1() -> void:
-	## Step 1: Pick bot type.
+	## Step 1: Pick bot type. Game pauses while menu is open.
 	build_step = 1
 	selected_bot = null
 	build_panel.visible = true
+	get_tree().paused = true
 	_rebuild_bot_list()
 
 
@@ -66,6 +67,7 @@ func _close_build_menu() -> void:
 	build_panel.visible = false
 	build_step = 0
 	selected_bot = null
+	get_tree().paused = false
 
 
 func _rebuild_bot_list() -> void:
