@@ -7,6 +7,8 @@ const BUTTON_SIZE := 80
 const DPAD_MARGIN := 20
 const ACTION_MARGIN := 20
 const BUTTON_ALPHA := 0.45
+const VIEWPORT_W := 1280
+const VIEWPORT_H := 720
 
 var _dpad_buttons: Dictionary = {}  # action_name -> TouchScreenButton-like control
 var _action_buttons: Dictionary = {}
@@ -17,6 +19,7 @@ var _active_touches: Dictionary = {}  # touch_index -> control
 
 func _ready() -> void:
 	layer = 100  # On top of everything
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	if not _is_touch_device():
 		# CanvasLayer.visible hides all children on this layer.
 		visible = false
@@ -52,14 +55,13 @@ func _build_ui() -> void:
 func _build_dpad() -> void:
 	var container := Control.new()
 	container.name = "DPad"
-	container.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_control_root.add_child(container)
 
 	# D-pad layout: 3x3 grid, only the cross cells are used
-	# Positions relative to bottom-left corner
-	var base_x := DPAD_MARGIN
-	var base_y := -DPAD_MARGIN - BUTTON_SIZE * 3  # 3 rows up from bottom
+	# Absolute positions: bottom-left of viewport
+	var base_x := 30.0
+	var base_y := float(VIEWPORT_H) - 280.0
 
 	var dpad_defs := {
 		"move_up":    Vector2(base_x + BUTTON_SIZE, base_y),
@@ -86,13 +88,12 @@ func _build_dpad() -> void:
 func _build_action_buttons() -> void:
 	var container := Control.new()
 	container.name = "ActionButtons"
-	container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_control_root.add_child(container)
 
-	# Right-aligned: offset from right edge
-	var base_x := -ACTION_MARGIN - BUTTON_SIZE
-	var base_y := -ACTION_MARGIN - BUTTON_SIZE
+	# Absolute positions: bottom-right of viewport
+	var base_x := float(VIEWPORT_W) - 130.0
+	var base_y := float(VIEWPORT_H) - 280.0
 
 	var action_defs := [
 		{"name": "mine", "label": "⛏", "offset": Vector2(0, -BUTTON_SIZE - 10)},
