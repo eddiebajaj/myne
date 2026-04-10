@@ -30,6 +30,28 @@ Myne is a young girl in a mining village, coming of age as a miner. Her father �
 - Was likely involved in the father's original deep-mine research
 - Stays in the home village — Myne fast travels back for Lab work
 
+### Mother
+- Married a legendary miner knowing exactly what that meant — she's strong, not naive
+- Supportive, warm, proud of Myne — never tries to stop her from mining
+- Tells stories about dad as a person, not a legend — how he was when he was young, how he found the necklace, how he named Myne
+- Fills in the personal side of dad that letters and Lab NPC can't
+- No mechanics attached — she's home. She's the emotional anchor.
+- Her dialogue changes as Myne goes deeper, but she stays steady and proud
+- Key moment at B25F (ruins): "A whole city? ...He never told me that part. That stubborn man." — first time she didn't know something
+
+#### Mom's Dialogue Progression
+
+| Phase | What She Says | Purpose |
+|---|---|---|
+| Prologue | "Your father was just like you on his first day. Couldn't stop grinning. Go make us proud." | Sets family tone |
+| After B5F | "A bot from the necklace? Ha! Your father made three fight each other once to see which was strongest." | Dad stories, humanizes him |
+| After B10F | "He used to track crystal dust all over the house. Glowing bits in the laundry for weeks." | Light, warm, keeps things grounded |
+| After B15F | "Your father drew those patterns on everything. Napkins, walls, your baby blanket. I still have the drawings." | Connects home to mine discoveries |
+| After B20F (letters stop) | "He'll be fine. That man survived things that would make the king faint. He's probably too busy to write." | Steady confidence, calms the player |
+| After B25F (ruins) | "He never told me that part. He just said he found 'something important.' That stubborn man." | First crack — she didn't know |
+| After B30F | "You're going after him, aren't you? Good. Tell him dinner's getting cold." | Pure mom energy. She knows, she supports. |
+| Post-game | "Welcome home, both of you. Now someone explain what took so long." | Payoff. |
+
 ### The King
 - Close friend of Myne's father
 - Summoned the father after receiving his report about the deep mines
@@ -296,13 +318,73 @@ Story beats occur at checkpoints (every 5 floors). Expanded across 50 floors / 5
 4. **Coming of age** — Myne starts as a kid with a pickaxe and ends as someone who holds the fate of two civilizations
 5. **The things parents don't tell you** — Father knew everything, gave her the necklace anyway, left without explaining. Protective? Trust.
 
-## Father's Letters (Collectible / Story Pacing)
+## Father's Letters (Story Pacing)
 
-Letters from the father arrive in town or are found in mines, providing story between checkpoints:
-- **B1F-B10F letters:** Cheerful, mining tips, dad jokes, "how's my little Myne doing?"
-- **B11F-B15F letters:** Tone shifts, mentions "complications" at the capital
-- **B16F-B20F letters:** "Be careful." Then they stop.
-- **Mine letters:** Found in caves or at specific floors, written during his original expedition years ago. Show a different side of dad — the explorer who found something terrifying.
+Letters arrive in town after reaching specific floors. They're Myne's connection to dad and the main emotional through-line for the first half of the game.
+
+### Town Letters (Delivered)
+
+| Trigger | Letter Content |
+|---|---|
+| After first run | "Dear Myne, I heard you went into the mine today! How was it? Did you name your pickaxe yet? You should. Mine is called 'Old Reliable.' The capital is nice but the food is nothing compared to home. Miss you already. — Dad" |
+| After B3F | "Portals, huh? Don't worry, I dealt with plenty of those. The trick is: don't panic, build something, and hit what you can't build against. You're a miner, Myne. You'll figure it out. PS: Have you tried the crystal on anything interesting yet?" |
+| After B5F | "B5F! That's my girl. Most village miners never go past B3F. The mines get stranger below. Trust the necklace — it kept me safe for years. I'll tell you the whole story when I get back. Love, Dad" |
+| After B10F | "Things are taking longer here at the capital than I expected. The king has questions I don't have answers to yet. Don't worry about me — focus on your mining. You're doing great." |
+| After B12F | "Myne, the crystal veins you're seeing — I saw them too. They're beautiful, aren't they? But... be careful around them. Sometimes I think they react to us. Maybe that's just an old miner's imagination." |
+| After B15F | "Be careful, Myne. Don't go deeper than you're ready for. I mean it. Please." |
+| After B15F | **Letters stop.** The silence IS the story. |
+
+### Mine Letters (Found in caves — optional collectibles)
+
+Old notes scratched on walls or left behind during dad's original expedition years ago. These are optional cave discoveries that go into the Codex.
+
+| Floor Range | Content |
+|---|---|
+| B8F-B10F | "Day 12 down here. The veins are getting thicker. Old Reliable is holding up. Something about this crystal... it hums when I get close." |
+| B18F-B20F | "The patterns are too regular to be natural. I've been mapping them. They look like streets. That can't be right." |
+| B25F-B28F | "It's a city. A whole city, frozen in crystal. I can see shapes that might have been people. I need to tell the king. I need to tell someone." |
+| B33F-B35F | "I'm going back down. The king wants answers. Myne is old enough now. I'll give her the necklace and go. She'll understand someday. I hope." |
+
+### Lab NPC Knowledge Reveal
+
+| Phase | What He Says | What He Actually Knows |
+|---|---|---|
+| Prologue | "Your father asked me to look after you" | He helped dad study the crystal for years |
+| B5F | "Fascinating, the necklace resonated..." | He knew it would do this |
+| B10F | "Your father said the same thing about the veins" | He's seen dad's full research notes |
+| B15F | "These aren't natural formations" | He knows it's a civilization |
+| B20F (letters stop) | "I'm sure he's fine... he's the strongest miner alive" | He's worried. Knows where dad went. |
+| B25F (ruins) | "Your father found this. This is what he reported to the king." | Finally starts being honest |
+| B30F | Full disclosure — tells Myne everything he knows | Protecting her, not deceiving her |
+
+**His motivation:** He promised dad he'd look after Myne. He held back information to let her grow into it, not to deceive her. When she reaches the ruins, he realizes she's strong enough for the truth.
+
+## Codex (Collectible System)
+
+A collectible journal that records lore, letters, and relics Myne finds throughout her journey.
+
+### Codex Categories
+
+| Category | Source | Contents |
+|---|---|---|
+| Father's Letters | Town deliveries + mine discoveries | All letters, both delivered and found |
+| Expedition Notes | Cave discoveries (mine letters) | Dad's old expedition journal entries |
+| Civilization Relics | Cave loot, checkpoint discoveries | Artifacts from the crystal civilization — tools, art, inscriptions |
+| Crystal Visions | Triggered by necklace at key moments | Brief memories/emotions from the crystal people |
+| Bestiary | Defeating enemy types | Enemy descriptions, lore about fauna and mineral entities |
+
+### Design Intent
+- Gives lore-hunters a reason to explore every cave
+- Builds the world for players who want depth, without forcing it
+- Civilization relics tell the story of who the crystal people were before they were crystallized
+- Crystal visions become more frequent and clear as Myne goes deeper
+- Bestiary fills in naturally through gameplay
+- Completion percentage visible (for completionists)
+
+### Codex Access
+- Accessible from pause menu in mine or from home in town
+- New entries flash a subtle notification when found
+- Entries are permanent — persist across runs and deaths
 
 ## Sidequest Narrative Hooks
 

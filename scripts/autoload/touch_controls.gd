@@ -18,10 +18,13 @@ var _active_touches: Dictionary = {}  # touch_index -> control
 func _ready() -> void:
 	layer = 100  # On top of everything
 	if not _is_touch_device():
+		# CanvasLayer.visible hides all children on this layer.
 		visible = false
 		set_process_input(false)
 		return
 	_build_ui()
+	# Ensure touch input processing is on.
+	set_process_input(true)
 
 
 func _is_touch_device() -> bool:
@@ -141,34 +144,23 @@ func _create_touch_button(text: String, pos: Vector2, action_name: String, is_dp
 	panel.set_meta("is_dpad", is_dpad)
 	panel.set_meta("is_pressed", false)
 
-	panel.gui_input.connect(_on_button_gui_input.bind(panel))
-
 	return panel
 
 
-func _on_button_gui_input(event: InputEvent, panel: Panel) -> void:
-	var action_name: String = panel.get_meta("action_name")
-	var is_dpad: bool = panel.get_meta("is_dpad")
+func _get_all_buttons() -> Array:
+	var buttons: Array = []
+	for btn in _dpad_buttons.values():
+		buttons.append(btn)
+	for btn in _action_buttons.values():
+		buttons.append(btn)
+	return buttons
 
-	if event is InputEventScreenTouch:
-		var touch_event := event as InputEventScreenTouch
-		if touch_event.pressed:
-			_press_action(action_name, panel)
-			_active_touches[touch_event.index] = panel
-		else:
-			_release_action(action_name, panel)
-			_active_touches.erase(touch_event.index)
-		panel.accept_event()
 
-	elif event is InputEventMouseButton:
-		# Also handle mouse for testing on desktop
-		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_LEFT:
-			if mb.pressed:
-				_press_action(action_name, panel)
-			else:
-				_release_action(action_name, panel)
-			panel.accept_event()
+func _find_button_at(pos: Vector2) -> Panel:
+	for btn in _get_all_buttons():
+		if btn.get_global_rect().has_point(pos):
+			return btn
+	return null
 
 
 func _press_action(action_name: String, panel: Panel) -> void:
@@ -188,8 +180,28 @@ func _release_action(action_name: String, panel: Panel) -> void:
 
 
 func _input(event: InputEvent) -> void:
-	# Handle touch drag leaving a button — release the action
-	if event is InputEventScreenDrag:
+	# Handle touch events directly via hit-testing instead of gui_input,
+	# because gui_input does not receive InputEventScreenTouch when
+	# emulate_mouse_from_touch is disabled (the default for this project).
+
+	if event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed:
+			var panel := _find_button_at(touch.position)
+			if panel:
+				var action_name: String = panel.get_meta("action_name")
+				_press_action(action_name, panel)
+				_active_touches[touch.index] = panel
+				get_viewport().set_input_as_handled()
+		else:
+			if touch.index in _active_touches:
+				var panel: Panel = _active_touches[touch.index]
+				var action_name: String = panel.get_meta("action_name")
+				_release_action(action_name, panel)
+				_active_touches.erase(touch.index)
+				get_viewport().set_input_as_handled()
+
+	elif event is InputEventScreenDrag:
 		var drag := event as InputEventScreenDrag
 		if drag.index in _active_touches:
 			var panel: Panel = _active_touches[drag.index]
@@ -198,3 +210,22 @@ func _input(event: InputEvent) -> void:
 				var action_name: String = panel.get_meta("action_name")
 				_release_action(action_name, panel)
 				_active_touches.erase(drag.index)
+
+	elif event is InputEventMouseButton:
+		# Also handle mouse clicks for desktop testing.
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT:
+			if mb.pressed:
+				var panel := _find_button_at(mb.position)
+				if panel:
+					var action_name: String = panel.get_meta("action_name")
+					_press_action(action_name, panel)
+					_active_touches[-1] = panel  # use -1 as mouse index
+					get_viewport().set_input_as_handled()
+			else:
+				if -1 in _active_touches:
+					var panel: Panel = _active_touches[-1]
+					var action_name: String = panel.get_meta("action_name")
+					_release_action(action_name, panel)
+					_active_touches.erase(-1)
+					get_viewport().set_input_as_handled()
