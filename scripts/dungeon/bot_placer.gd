@@ -68,7 +68,7 @@ func _confirm_placement() -> void:
 		# Determine tier/mineral from ore
 		result = {"ore_tier": 1, "mineral": null}
 		for slot in Inventory.get_ore_stacks():
-			var key := slot.ore.id
+			var key: String = slot.ore.id
 			if slot.mineral:
 				key += ":" + slot.mineral.id
 			if key == selected_ore_id + (":" + selected_mineral_id if selected_mineral_id != "" else ""):

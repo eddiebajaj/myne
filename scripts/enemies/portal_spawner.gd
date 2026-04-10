@@ -18,7 +18,7 @@ var current_warning_time: float = 3.0
 
 func _ready() -> void:
 	_build_entity_defs()
-	var is_rock_triggered := has_meta("rock_triggered") and get_meta("rock_triggered")
+	var is_rock_triggered: bool = has_meta("rock_triggered") and get_meta("rock_triggered")
 	var floor_num := GameManager.current_floor
 	if is_rock_triggered:
 		# Rock-triggered portal: 1.5s warning, single wave

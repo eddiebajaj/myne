@@ -48,7 +48,7 @@ func _spawn_cave_ore() -> void:
 	var floor_gen := _find_floor_generator()
 	if floor_gen == null:
 		return
-	var rare_ores := floor_gen.get_rare_ores()
+	var rare_ores = floor_gen.get_rare_ores()
 	var all_minerals := MineralData.get_all_minerals()
 	for i in range(randi_range(3, 6)):
 		var ore_data: OreData = rare_ores[randi() % rare_ores.size()]

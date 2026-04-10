@@ -22,8 +22,22 @@ jobs:
 
       - name: Setup export templates
         run: |
-          mkdir -p /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          mv /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ || true
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          # barichello/godot-ci stores templates in multiple possible locations
+          cp /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
+          cp /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
+          # Also try the GitHub Actions home path
+          mkdir -p /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          cp /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
+          cp /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
+          # List what we have for debugging
+          echo "Templates in home:"
+          ls -la ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || echo "none in ~"
+          echo "Templates in /github/home:"
+          ls -la /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || echo "none in /github/home"
+          echo "Templates in /root:"
+          ls -la /root/.local/share/godot/templates/${GODOT_VERSION}.stable/ 2>/dev/null || echo "none in /root/templates"
+          ls -la /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || echo "none in /root/export_templates"
 
       - name: Create build directory
         run: mkdir -p build/web
@@ -60,8 +74,12 @@ jobs:
 
       - name: Setup export templates
         run: |
-          mkdir -p /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          mv /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ || true
+          mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          cp /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
+          cp /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
+          mkdir -p /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          cp /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
+          cp /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
 
       - name: Setup Android SDK
         run: |
@@ -77,7 +95,9 @@ jobs:
       - name: Setup debug keystore
         run: |
           mkdir -p /root/.android
+          mkdir -p /github/home/.android
           keytool -genkey -v -keystore /root/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Debug,O=Debug,C=US"
+          cp /root/.android/debug.keystore /github/home/.android/debug.keystore 2>/dev/null || true
 
       - name: Create build directory
         run: mkdir -p build/android

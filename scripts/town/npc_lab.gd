@@ -71,8 +71,8 @@ func _refresh_ui() -> void:
 		var btn := Button.new()
 		btn.text = "Extract %s from %s (x%d)" % [slot.mineral.display_name, slot.ore.display_name, slot.quantity]
 		btn.disabled = GameManager.gold < EXTRACT_COST
-		var ore := slot.ore
-		var mineral := slot.mineral
+		var ore = slot.ore
+		var mineral = slot.mineral
 		btn.pressed.connect(func():
 			if GameManager.spend_gold(EXTRACT_COST):
 				# Remove 1 mineral ore, add 1 plain ore, store mineral
@@ -101,7 +101,7 @@ func _refresh_ui() -> void:
 			var btn := Button.new()
 			btn.text = "Infuse %s onto %s" % [stored_mineral.display_name, plain_slot.ore.display_name]
 			btn.disabled = GameManager.gold < INFUSE_COST
-			var ore := plain_slot.ore
+			var ore = plain_slot.ore
 			var min_copy := stored_mineral
 			btn.pressed.connect(func():
 				if GameManager.spend_gold(INFUSE_COST):

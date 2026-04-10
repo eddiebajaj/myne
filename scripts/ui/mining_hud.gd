@@ -108,14 +108,14 @@ func _rebuild_ore_list() -> void:
 		if slot.mineral:
 			ore_name += " (%s)" % slot.mineral.display_name
 			mineral_id = slot.mineral.id
-		var can_afford := slot.quantity >= selected_bot.ore_count
-		var tier_info := "T%d" % slot.ore.tier
+		var can_afford: bool = slot.quantity >= selected_bot.ore_count
+		var tier_info: String = "T%d" % slot.ore.tier
 		var btn := Button.new()
 		btn.text = "%s %s x%d — Bot stats x%.1f" % [tier_info, ore_name, slot.quantity, BotData.get_tier_mult(slot.ore.tier)]
 		if slot.mineral:
 			btn.text += " + %s effect" % slot.mineral.display_name
 		btn.disabled = not can_afford
-		var oid := slot.ore.id
+		var oid: String = slot.ore.id
 		var mid := mineral_id
 		btn.pressed.connect(func():
 			_close_build_menu()
