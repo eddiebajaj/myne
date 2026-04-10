@@ -265,7 +265,7 @@ func _add_wall(pos: Vector2, size: Vector2) -> void:
 	var rect := ColorRect.new()
 	rect.size = size
 	rect.position = -size / 2
-	rect.color = Color(0.25, 0.2, 0.18)
+	rect.color = Color(0.4, 0.32, 0.25)
 	wall.add_child(rect)
 	walls.add_child(wall)
 

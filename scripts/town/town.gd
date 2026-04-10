@@ -18,7 +18,7 @@ func _ready() -> void:
 	# Ensure game is not paused
 	get_tree().paused = false
 	player.add_to_group("player")
-	player.position = Vector2(400, 500)
+	player.position = Vector2(640, 500)
 	mine_button.pressed.connect(_on_start_mining)
 	sell_button.pressed.connect(_on_sell_ore)
 	mine_entrance.body_entered.connect(func(body):
