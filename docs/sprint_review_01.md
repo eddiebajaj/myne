@@ -124,12 +124,117 @@ Establish the full game design foundation, scaffold the project, and deliver a p
 - CI/CD pipeline established — push-to-deploy workflow
 - Mom's character arc hit the right emotional notes
 - Father's letters provide pacing without cutscenes
+- Collaborative design process worked well — user provides vision, PO proposes options, user decides
 
 ## What Needs Improvement
 - PO agent did tech work multiple times instead of delegating — corrected mid-sprint
 - Sub-agents frequently blocked on bash permissions — need skip-permissions enabled
 - CI/CD took 6 iterations to get right — should have researched godot-ci setup better upfront
-- Touch controls still not working on mobile — needs another iteration
+- Touch controls took 3 iterations to fix — should have caught invalid UIDs and positioning issues earlier
+- Tech agent couldn't commit its own work due to permission blocks — slowed the pipeline
+
+## Retrospective — PO Agent Self-Assessment
+
+### What I did well
+- Kept design discussions focused and decision-oriented — proposed options, let the user choose
+- Built design docs incrementally, updating them as decisions were made
+- Caught pacing issues (user flagged B5F-B10F being too fast — I should have caught this myself)
+- Established a clear agent delegation structure by end of sprint
+
+### What I need to improve
+
+**1. Stay in my lane.**
+I fixed GDScript errors, CI/CD configs, and export settings directly instead of delegating to the tech agent. This happened 4+ times. Even "simple" fixes should go through the tech agent — that's their job. My role is to brief clearly, review output, and coordinate.
+
+**2. Brief tech agents more thoroughly.**
+Multiple tech agent runs failed because my briefs didn't include enough context about the runtime environment (container limitations, Godot web export quirks, permission constraints). Better briefs = fewer iterations.
+
+**3. Validate tech output before shipping.**
+The touch controls scene had an obviously invalid UID (`uid://touch_controls_scene`) that I should have caught during review. I committed and pushed without checking the .tscn file contents. Review means actually reading the output, not just checking that the agent completed.
+
+**4. Anticipate platform constraints earlier.**
+The Forward+ → GL Compatibility switch, the container vs host action issue, the butler URL change — these were all knowable problems that could have been avoided with upfront research instead of reactive fixes.
+
+**5. Track design decisions in real-time.**
+Several times I had to re-explain decisions to new agents because I hadn't documented them yet. Design decisions should be written to docs immediately, not batched.
+
+### Process improvements for next sprint
+- Always delegate tech work to tech agent, no exceptions
+- Review all agent output file-by-file before committing
+- Research platform constraints (web export, CI/CD) before implementation
+- Brief agents with explicit file paths, line numbers, and expected behavior
+- Run a quick validation check after each deploy (not just "did CI pass" but "does it actually work")
+
+## Retrospective — Design Agent
+
+### Tasks completed
+- Created T1 balance document (13_balance_t1.md) with implementation-ready values
+- Defined ore costs per bot type (Turret=3, Mining Rig=4, Mining Drone=6, Combat Drone=8)
+- Defined enemy stats for all T1 enemies (HP, damage, speed, attack rate, aggro ranges)
+- Defined portal timer values (first wave delays, subsequent intervals, wave composition)
+- Defined floor layout numbers (ore nodes, rocks, treasure distribution)
+- Confirmed backpack dimensions (4x4, 1x1 ore, batteries separate)
+- Provided code-ready reference tables for tech agent (Section 9)
+
+### What went well
+- Produced concrete, implementable numbers — not vague ranges or "TBD"
+- Cross-referenced existing code values and noted where they diverged
+- Included rationale for every number ("turret at 3 ore is buildable after mining 3 nodes")
+- Bot vs enemy matchup scenarios helped validate balance
+- Time budget per floor confirmed the 30-60 second target from design docs
+
+### What needs improvement
+- Only covered T1 balance — T2-T4 still unbalanced and unspecified
+- Some values are marked "(tuning needed)" — need playtesting to validate
+- Did not address mineral effects on bot stats (Fire turret damage bonus, etc.)
+- Did not define difficulty scaling curves across the full 50 floors
+
+### Action items for next sprint
+- [ ] Define T2 balance values once T1 is playtested and validated
+- [ ] Design mineral effect multipliers per mineral type
+- [ ] Create a difficulty scaling curve document for floors 1-50
+
+## Retrospective — Tech Agent
+
+### Tasks completed
+- Implemented Phase 1 playable mine loop (10 files, 402 lines added)
+- Created Rock class with stairs discovery, treasure loot, portal triggers
+- Rewrote PortalSpawner for timed wave system matching balance doc
+- Updated all bot and enemy stats to match T1 balance values
+- Added sell button to town scene
+- Added build menu pause functionality
+- Created touch controls autoload (3 iterations to fix)
+- Fixed CI/CD workflow multiple times (butler action, container splitting)
+
+### What went well
+- Built on existing scaffold rather than rewriting — understood the codebase
+- Matched balance doc values exactly (Section 9 code-ready tables helped)
+- Rock system cleanly integrates stairs discovery, treasure, and portal triggers in one class
+- Portal spawner correctly implements both timed and rock-triggered portals
+
+### What needs improvement
+
+**1. Code quality issues shipped to CI.**
+- GDScript type inference errors (`:=` on expressions Godot can't infer) — these should have been caught before committing. The agent should test-parse scripts or at least know Godot 4.2's type inference limitations.
+
+**2. Scene files with invalid data.**
+- Touch controls .tscn had a made-up UID (`uid://touch_controls_scene`) that caused silent autoload failure. The agent fabricated a UID instead of omitting it. Scene files should either use Godot-generated UIDs or no UID at all.
+
+**3. UI positioning assumptions.**
+- Touch controls used anchor-relative negative offsets that placed buttons offscreen. Should have used absolute viewport coordinates from the start, since the viewport size (1280x720) is known.
+
+**4. Insufficient self-testing.**
+- Multiple issues (invisible colors, offscreen buttons, broken input routing) would have been caught with basic "does this render" validation. The agent should describe expected visual output and flag uncertainty.
+
+**5. Bash permission blocks.**
+- Agent was blocked from running git commands in 4+ sessions, requiring the PO to commit manually. This slowed every delivery cycle. Root cause: sub-agent permission settings.
+
+### Action items for next sprint
+- [ ] Always omit UIDs in manually-created .tscn files
+- [ ] Use explicit types instead of `:=` for any non-trivial expressions
+- [ ] Use absolute positioning for UI elements when viewport size is known
+- [ ] Include a "visual verification checklist" in commit messages for UI changes
+- [ ] Resolve bash permission issue for sub-agents (user to enable skip-permissions)
 
 ## Action Items for Next Sprint
 - [ ] Fix touch controls for mobile web play
