@@ -1,0 +1,106 @@
+name: Build and Deploy to itch.io
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.2.2"
+  ITCH_USER: "bajaj"
+  ITCH_GAME: "myne"
+
+jobs:
+  export-web:
+    name: Export Web Build
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.2.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup export templates
+        run: |
+          mkdir -p /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mv /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ || true
+
+      - name: Create build directory
+        run: mkdir -p build/web
+
+      - name: Export Web
+        run: godot --headless --verbose --export-release "Web" build/web/index.html
+
+      - name: Upload Web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web/
+
+      - name: Install butler
+        run: |
+          curl -L -o butler.zip https://broth.itch.io/butler/linux-amd64/LATEST/archive/default
+          unzip butler.zip
+          chmod +x butler
+          mv butler /usr/local/bin/
+
+      - name: Push to itch.io (Web)
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: butler push build/web/ ${ITCH_USER}/${ITCH_GAME}:html5
+
+  export-android:
+    name: Export Android APK
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.2.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup export templates
+        run: |
+          mkdir -p /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mv /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ || true
+
+      - name: Setup Android SDK
+        run: |
+          apt-get update && apt-get install -y openjdk-17-jdk wget unzip
+          export ANDROID_HOME=/opt/android-sdk
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
+          unzip -q cmdtools.zip -d $ANDROID_HOME/cmdline-tools
+          mv $ANDROID_HOME/cmdline-tools/cmdline-tools $ANDROID_HOME/cmdline-tools/latest
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Setup debug keystore
+        run: |
+          mkdir -p /root/.android
+          keytool -genkey -v -keystore /root/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Debug,O=Debug,C=US"
+
+      - name: Create build directory
+        run: mkdir -p build/android
+
+      - name: Export Android
+        env:
+          ANDROID_HOME: /opt/android-sdk
+        run: godot --headless --verbose --export-release "Android" build/android/myne.apk
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: build/android/
+
+      - name: Install butler
+        run: |
+          curl -L -o butler.zip https://broth.itch.io/butler/linux-amd64/LATEST/archive/default
+          unzip butler.zip
+          chmod +x butler
+          mv butler /usr/local/bin/
+
+      - name: Push to itch.io (Android)
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: butler push build/android/myne.apk ${ITCH_USER}/${ITCH_GAME}:android
