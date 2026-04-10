@@ -51,17 +51,14 @@ jobs:
           name: web-build
           path: build/web/
 
-      - name: Install butler
-        run: |
-          curl -L -o butler.zip https://broth.itch.io/butler/linux-amd64/LATEST/archive/default
-          unzip butler.zip
-          chmod +x butler
-          mv butler /usr/local/bin/
-
       - name: Push to itch.io (Web)
-        env:
-          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-        run: butler push build/web/ ${ITCH_USER}/${ITCH_GAME}:html5
+        uses: lsdev/butler-push@v1
+        with:
+          butler-key: ${{ secrets.BUTLER_API_KEY }}
+          directory: build/web/
+          itch-user: ${{ env.ITCH_USER }}
+          itch-game: ${{ env.ITCH_GAME }}
+          channel: html5
 
   export-android:
     name: Export Android APK
@@ -113,14 +110,11 @@ jobs:
           name: android-build
           path: build/android/
 
-      - name: Install butler
-        run: |
-          curl -L -o butler.zip https://broth.itch.io/butler/linux-amd64/LATEST/archive/default
-          unzip butler.zip
-          chmod +x butler
-          mv butler /usr/local/bin/
-
       - name: Push to itch.io (Android)
-        env:
-          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
-        run: butler push build/android/myne.apk ${ITCH_USER}/${ITCH_GAME}:android
+        uses: lsdev/butler-push@v1
+        with:
+          butler-key: ${{ secrets.BUTLER_API_KEY }}
+          directory: build/android/
+          itch-user: ${{ env.ITCH_USER }}
+          itch-game: ${{ env.ITCH_GAME }}
+          channel: android
