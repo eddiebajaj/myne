@@ -12,6 +12,7 @@ config/features=PackedStringArray("4.2", "GL Compatibility")
 
 GameManager="*res://scripts/autoload/game_manager.gd"
 Inventory="*res://scripts/autoload/inventory.gd"
+TouchControls="*res://scenes/ui/touch_controls.tscn"
 
 [display]
 
@@ -29,6 +30,11 @@ window/stretch/aspect="keep"
 2d_physics/layer_5="walls"
 2d_physics/layer_6="stairs"
 2d_physics/layer_7="interactables"
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+pointing/emulate_mouse_from_touch=false
 
 [input]
 

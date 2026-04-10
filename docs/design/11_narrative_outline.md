@@ -28,12 +28,14 @@ Myne is a young girl in a mining village, coming of age as a miner. Her father �
 - Knows more than he initially lets on about the crystal's origin
 - The one who enables permanent bots and merge technology
 - Was likely involved in the father's original deep-mine research
+- Stays in the home village — Myne fast travels back for Lab work
 
 ### The King
 - Close friend of Myne's father
 - Summoned the father after receiving his report about the deep mines
 - His motives are initially unclear — is he trying to protect the kingdom, weaponize the crystal, or suppress the truth?
 - Eventually revealed to be acting out of genuine concern
+- NPC in the Royal Capital (final town)
 
 ## The Crystal Civilization (The Threat)
 
@@ -49,13 +51,51 @@ An ancient civilization that existed deep underground long before the current wo
 
 ---
 
-## Act Structure
+## World Structure
 
-Story beats occur at checkpoints (every 5 floors). Four acts across 20 floors.
+Myne's journey follows her father's path across multiple regions. Each region has its own town and mine.
+
+| Region | Mine Floors | Town | Story Phase |
+|---|---|---|---|
+| 1. Home Village | B1F - B10F | Starting town (Lab, Smith, Market) | Learning the ropes |
+| 2. TBD | B11F - B20F | TBD | Getting serious |
+| 3. TBD | B21F - B30F | TBD | The truth unfolds |
+| 4. Royal Capital | B31F - B40F | Capital city | Dad's trail ends here |
+| 5. The Core | B41F - B50F | None (point of no return) | Final dungeon |
+
+- Town contents are open — NPCs, sidequests, and flavor to be designed per region
+- Lab NPC stays in Home Village — player fast travels back for bot work
+- Each new town has its own Smith tier, Market stock, and quest NPCs
+- The Royal Capital is the last town — connects directly to the Core mine
+- Story gates between regions: reaching a checkpoint triggers town events/quests that must be completed before the next region opens
+
+### Region Transitions
+- Clearing B10F → story event unlocks path to Region 2 (+ sidequests may gate it)
+- Clearing B20F → story event unlocks path to Region 3
+- Clearing B30F → story event unlocks Royal Capital
+- Clearing B40F → path to the Core opens (point of no return warning)
 
 ---
 
-### PROLOGUE — Town / Pre-Mine
+## Tone Arc
+
+| Phase | Floors | Tone | Emotion |
+|---|---|---|---|
+| Early game | B1F - B10F | Wonder / curiosity | "This is cool! What can this necklace do?" |
+| Mid game | B11F - B20F | Unease / fascination | "These crystals look like... buildings?" |
+| Late game | B21F - B30F | Weight / determination | "This was a civilization. I have to find dad." |
+| Capital | B31F - B40F | Revelation / resolve | "Dad was here. The king knows everything." |
+| The Core | B41F - B50F | Emotional / bittersweet | "They were people. What do I do?" |
+
+---
+
+## Act Structure
+
+Story beats occur at checkpoints (every 5 floors). Expanded across 50 floors / 5 regions.
+
+---
+
+### PROLOGUE — Home Village
 
 **Setting:** Mining village, Myne's birthday
 
@@ -70,91 +110,181 @@ Story beats occur at checkpoints (every 5 floors). Four acts across 20 floors.
 
 ---
 
-### ACT 1 — The New Miner (B1F - B10F)
+### REGION 1 — Home Village Mine (B1F - B10F)
 *Theme: Learning the craft, discovering the crystal's power*
 
-#### Checkpoint 1 — B5F: First Signs
+#### Checkpoint 1 — B5F: The Awakening
 
 **Story beat:**
 - Myne reaches B5F — deeper than most village miners go
-- First encounter with a portal — something is wrong down here
-- Lab Researcher examines the necklace: "Interesting... the crystal reacts to the minerals around it. That's how you're building those bots."
-- First permanent bot unlocked — Lab Researcher builds it using the necklace's resonance
-- Village miners mention the mines have been getting more dangerous lately
-- Optional: Letters from father arrive — he's arrived at the capital, everything is fine, keep mining
+- Safe checkpoint room — no enemies
+- Myne discovers a crystallized object embedded in the wall — looks like an old mining tool, made entirely of crystal
+- Her necklace glows as she approaches it
+- She touches it — the crystal cracks and reshapes into her first permanent bot
+- The bot recognizes her somehow, follows her loyally
+- Lab Researcher: "Fascinating. The crystal in your necklace resonated with it. Your father's necklace could do this too... I always wondered."
+- First hint that Lab NPC knows more than he's saying
+- Letter from dad arrives: "How deep have you gone? B5F? That's my girl. The mines get stranger below. Trust the necklace."
 
-**Gameplay unlock:** First permanent bot (solo merge available)
+**Gameplay unlock:** First permanent bot (Scout), solo merge available
 
-**Player feels:** Mines are more dangerous than expected. The necklace is special. But dad says everything's fine, so it's probably fine. Right?
+**Player feels:** Wonder, excitement. The necklace is special. The bot is cool. Dad says trust it. Let's go deeper.
 
-#### Checkpoint 2 — B10F: The Crystal Veins
+#### Checkpoint 2 — B10F: First Signs
 
 **Story beat:**
-- B10F is deep — the mine walls start showing crystal veins that pulse with light
-- Lab Researcher is fascinated and concerned: "These crystals... they're not natural mineral formations. They're structured. Almost like... architecture."
-- The portal enemies are getting more frequent and more aggressive
-- Myne notices her necklace glowing brighter the deeper she goes
-- Second permanent bot unlocked — Lab Researcher's research advancing
-- Merge system unlocked — dual merge tutorial
-- Letters from father stop coming
+- The mine walls start showing faint crystal veins
+- Nothing dramatic yet — just hints of geometric patterns in the rock
+- Portal activity has been increasing — something is reacting to Myne going deeper
+- Myne notices her necklace glowing brighter
+- Story gate: reaching B10F triggers events back in town that unlock Region 2
+- Letter from dad: cheerful but mentions "complications at the capital, nothing to worry about"
 
-**Gameplay unlock:** Second permanent bot, dual merge
+**Gameplay unlock:** Region 2 access (after town events/sidequests), T2 ore types begin appearing
 
-**Player feels:** Something is definitely wrong. The crystals look like buildings? Father's gone quiet. But the power is growing — the merge feels amazing.
+**Player feels:** Accomplished — cleared the home mine. Curious about the crystal veins. Dad's letters are getting slightly less carefree.
 
 ---
 
-### ACT 2 — The Discovery (B11F - B15F)
-*Theme: Revelation, the mines are not what they seem*
+### REGION 2 — TBD Mine (B11F - B20F)
+*Theme: Getting serious, the mines are more than mines*
 
-#### Checkpoint 3 — B15F: The Ruins
+#### Checkpoint 3 — B15F: The Architecture
 
 **Story beat:**
-- B15F — Myne breaks through into a vast crystallized cavern
+- Crystal veins are thick here — geometric, structured, undeniably artificial
+- Lab Researcher: "These aren't mineral formations. They're structured. Almost like... architecture."
+- Myne finds another crystallized object — larger, more complex
+- Necklace resonates — second permanent bot awakens
+- This bot feels different. More aware. More... old.
+- Letter from dad: tone shifts. "Be careful, Myne. Don't go deeper than you're ready for."
+
+**Gameplay unlock:** Second permanent bot (Guardian), dual merge unlocked
+
+**Player feels:** The merge is incredible — power fantasy moment. But the architecture in the walls is unsettling. Dad sounds worried for the first time.
+
+#### Checkpoint 4 — B20F: The Silence
+
+**Story beat:**
+- Deepest point in Region 2
+- Myne finds one of her father's old campsites — pickaxe marks on the wall, a scratched note: "The veins lead down. Following them."
+- Letters from dad stop coming
+- Portal enemies are becoming more organized, almost tactical
+- Region 3 unlocked after town events
+
+**Gameplay unlock:** Region 3 access, new enemy types
+
+**Player feels:** Dad has gone quiet. He was here. He went deeper. The enemies are changing. Growing unease.
+
+---
+
+### REGION 3 — TBD Mine (B21F - B30F)
+*Theme: The truth unfolds*
+
+#### Checkpoint 5 — B25F: The Ruins
+
+**Story beat:**
+- Myne breaks through into a vast crystallized cavern
 - Clearly visible: structures, buildings, streets — an entire city, frozen in crystal
 - The crystal civilization revealed — this was a real place with real people
-- Lab Researcher (via communication device? or he's at this checkpoint?): "Your father found this. This is what he reported to the king."
-- Portal activity spikes dramatically — the deeper Myne goes, the more the crystal reacts
+- Lab Researcher: "Your father found this. This is what he reported to the king."
 - Myne realizes: her bots are built from fragments of these people
-- A message or recording from the father, left behind on a previous expedition: "If you've made it this far, you're stronger than I thought. Be careful, Myne. It's alive."
 - The necklace pulses in sync with the ruins — it's a piece of this place
+- A message from the father, left behind: "If you've made it this far, you're stronger than I thought. It's alive, Myne."
 
 **Gameplay unlock:** T3 ore types, new enemy types (more crystalline, more humanoid)
 
-**Player feels:** Awe, unease. This changes everything. Dad was here. He knew. The power I've been using... what is it really?
+**Player feels:** Awe, unease. This changes everything. The power I've been using... what is it really?
+
+#### Checkpoint 6 — B30F: The Living Crystal
+
+**Story beat:**
+- Walls move, shift, react to Myne's presence
+- Mineral entities become more humanoid, more organized — remnants of people, not just monsters
+- The necklace begins "communicating" — brief visions, emotions, memories from the crystal people
+- Myne learns: the crystal civilization didn't choose this. Their own crystal technology consumed them. They're trapped.
+- Region 4 (Royal Capital) unlocked
+
+**Gameplay unlock:** Royal Capital access, crystal visions mechanic
+
+**Player feels:** Empathy for the enemy. They were people. The crystal trapped them. This is a tragedy, not a war.
 
 ---
 
-### ACT 3 — The Descent (B16F - B20F)
-*Theme: Confrontation, understanding, resolution*
+### REGION 4 — Royal Capital Mine (B31F - B40F)
+*Theme: Revelation, following dad's trail to the end*
 
-#### B16F-B19F: The Living Crystal
-
-**Events (across floors, not just checkpoints):**
-- The mine is no longer a mine — it's the crystal civilization's heart
-- Walls move, shift, react to Myne's presence
-- Mineral entities become more humanoid, more organized — not just monsters, remnants of people
-- The necklace begins "communicating" — visions, emotions, memories from the crystal people
-- Myne learns: the crystal civilization didn't choose this. Their own crystal technology consumed them. They're trapped, not evil.
-- The crystal is growing upward not to attack — it's trying to reach the surface because it's the only way the trapped people can "live"
-- But if it reaches the surface, it will crystallize everything above too
-
-#### Checkpoint 4 — B20F: The Core
+#### Checkpoint 7 — B35F: The King's Truth
 
 **Story beat:**
-- The heart of the crystal civilization — the source
-- Father is here (or a message from father is here, or father meets Myne here)
-- Reunion: Father explains everything
-  - He found this years ago, has been monitoring it
-  - The king and he have been trying to figure out how to stop the spread without destroying the trapped people
-  - The necklace is a key — a fragment that can communicate with the core
-  - He gave it to Myne because she's the one who can reach the core (he's too old? the necklace chose her? she has a unique resonance?)
-- Final confrontation: not necessarily a fight — possibly a choice
-  - Stop the crystal from spreading (save the surface, but the civilization dies forever)
-  - Find a way to coexist (harder path, better ending?)
-  - The merge system narratively ties in — Myne has been merging with crystal technology the whole game. She understands both worlds.
+- Myne arrives at the capital — the biggest town, the end of the road
+- She meets the King — he knows who she is immediately
+- The King explains: her father discovered the core, reported it, and they've been trying to figure out what to do ever since
+- The crystal is growing upward — it will reach the surface eventually
+- Her father went back down to try to communicate with the core using his necklace
+- He hasn't returned
+- The King: "He believed you would come. He said the necklace chose you."
 
-**Player feels:** Emotional reunion with dad. The "enemies" were people. The power was theirs. What do I do?
+**Gameplay unlock:** Final mine access, story context for everything
+
+**Player feels:** Dad is down there. He's been waiting for me. I have to go.
+
+#### Checkpoint 8 — B40F: The Descent
+
+**Story beat:**
+- Deepest point before the Core
+- Everything is crystal — the mine is gone, it's pure civilization remains
+- Last safe point — the game warns you: going deeper is the point of no return
+- Myne's determination moment: she chooses to descend
+
+**Gameplay unlock:** The Core opens (B41F+)
+
+**Player feels:** Resolve. No turning back.
+
+---
+
+### REGION 5 — The Core (B41F - B50F)
+*Theme: Confrontation, understanding, resolution*
+
+#### B41F - B49F: The Heart
+
+**Events (across floors, not just checkpoints):**
+- The Core is not a mine — it's the living heart of the crystal civilization
+- Crystal formations that look like people, frozen mid-motion
+- The necklace communicates constantly — memories, feelings, desperation
+- Myne understands: the crystal is growing upward not to attack — it's the only way the trapped people can "live"
+- But if it reaches the surface, it will crystallize everything above too
+- Enemies here are the most humanoid — guardians of the core, not attackers
+
+#### Checkpoint 9 — B45F: Reunion
+
+**Story beat:**
+- Father is here — alive, waiting
+- Reunion: emotional, warm, dad jokes even now
+- Father explains everything:
+  - He found the core years ago, has been monitoring it
+  - The king and he have been trying to stop the spread without destroying the trapped people
+  - The necklace is a key — a fragment that can communicate with the core
+  - He gave it to Myne because she's the one who can reach the heart (the necklace chose her resonance)
+  - He couldn't do it alone — he needed her
+- Father: "I'm sorry I left, Myne. I'm sorry I couldn't tell you. But you're here now, and you're exactly who I knew you'd be."
+
+**Player feels:** Tears. Dad is OK. He believes in me. Let's finish this together.
+
+#### B50F: The Core Heart — Final Confrontation
+
+**Story beat:**
+- The absolute center of the crystal civilization
+- Not necessarily a boss fight — possibly a choice, a puzzle, a merge
+- Myne uses the necklace to communicate with the core directly
+- The core is the last consciousness of the civilization — desperate, afraid, reaching upward because it's dying
+- Final choice (TBD):
+  - Stop the crystal from spreading (save the surface, civilization dies forever)
+  - Find a way to coexist (harder path, better ending?)
+  - The merge system ties in narratively — Myne has been merging with crystal technology the whole game. She understands both worlds.
+- Father stands with her, whatever she chooses
+
+**Player feels:** Weight of the decision. Empathy for both sides. Resolution.
 
 ---
 
@@ -164,7 +294,15 @@ Story beats occur at checkpoints (every 5 floors). Four acts across 20 floors.
 2. **Power has a cost** — The crystal gives Myne incredible ability, but it comes from a tragedy
 3. **Understanding the "enemy"** — The mineral entities aren't evil, they're the remnants of people. The deeper Myne goes, the more she understands them.
 4. **Coming of age** — Myne starts as a kid with a pickaxe and ends as someone who holds the fate of two civilizations
-5. **The things parents don't tell you** — Father knew everything, gave her the necklace anyway, left without explaining. Protective? Manipulative? Trust?
+5. **The things parents don't tell you** — Father knew everything, gave her the necklace anyway, left without explaining. Protective? Trust.
+
+## Father's Letters (Collectible / Story Pacing)
+
+Letters from the father arrive in town or are found in mines, providing story between checkpoints:
+- **B1F-B10F letters:** Cheerful, mining tips, dad jokes, "how's my little Myne doing?"
+- **B11F-B15F letters:** Tone shifts, mentions "complications" at the capital
+- **B16F-B20F letters:** "Be careful." Then they stop.
+- **Mine letters:** Found in caves or at specific floors, written during his original expedition years ago. Show a different side of dad — the explorer who found something terrifying.
 
 ## Sidequest Narrative Hooks
 
@@ -172,26 +310,22 @@ Story beats occur at checkpoints (every 5 floors). Four acts across 20 floors.
 - Lab Researcher has research quests that slowly reveal crystal lore
 - Miners who went deep before and came back changed
 - Crystal fragments found in caves sometimes show visions of the ancient civilization
+- Each new town has region-specific quests and characters (TBD)
 - The Market merchant might be trading in crystal goods without knowing what they really are
-
-## Father's Letters (Collectible / Story Pacing)
-
-Letters from the father could be found in the mine or delivered in town, providing story between checkpoints:
-- Early letters: cheerful, mining tips, dad jokes, "how's my little Myne doing?"
-- Mid letters: tone shifts, mentions "complications" at the capital, tells her to be careful
-- Late letters: stop coming (he's gone deeper himself? he's at the core?)
-- Mine letters: found in caves or at specific floors, written during his original expedition years ago
 
 ## Open Design Questions
 
+- [ ] Region 2 and 3 settings, town themes, and mine aesthetics
 - [ ] How does the final confrontation play out mechanically? (Boss fight? Puzzle? Choice?)
 - [ ] Multiple endings based on player choice at the core?
-- [ ] Does the father join Myne for the final section? (Playable? NPC companion?)
+- [ ] Does the father join Myne as a companion for B45F-B50F?
 - [ ] Post-game content — what happens after the main story?
-- [ ] How does the Lab Researcher's knowledge unfold? (Does he know about the civilization from the start?)
+- [ ] How does the Lab Researcher's knowledge unfold across the full game?
 - [ ] Crystal visions — how are these presented? (Cutscenes? Playable flashbacks? Text?)
-- [ ] The king's role — does the player ever visit the capital?
-- [ ] Side characters in the village — who are they, what are their arcs?
+- [ ] Story gate details — what sidequests/events unlock each new region?
 - [ ] Does the necklace change/evolve visually as Myne goes deeper?
 - [ ] Permanent bot personalities — do they have character? Are they connected to the crystal people?
-- [ ] Father's expedition timeline — when did he first go deep? How long has he known?
+- [ ] How many permanent bots total, and where is each one earned?
+- [ ] Father's expedition timeline — when did he first go deep?
+- [ ] The King's personality and role in the capital
+- [ ] Point of no return mechanics — can the player go back after entering the Core?
