@@ -23,14 +23,11 @@ jobs:
       - name: Setup export templates
         run: |
           mkdir -p ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
-          # barichello/godot-ci stores templates in multiple possible locations
           cp /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
           cp /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
-          # Also try the GitHub Actions home path
           mkdir -p /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable
           cp /root/.local/share/godot/templates/${GODOT_VERSION}.stable/* /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
           cp /root/.local/share/godot/export_templates/${GODOT_VERSION}.stable/* /github/home/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || true
-          # List what we have for debugging
           echo "Templates in home:"
           ls -la ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/ 2>/dev/null || echo "none in ~"
           echo "Templates in /github/home:"
@@ -47,6 +44,17 @@ jobs:
 
       - name: Upload Web artifact
         uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web/
+
+  deploy-web:
+    name: Deploy Web to itch.io
+    runs-on: ubuntu-latest
+    needs: export-web
+    steps:
+      - name: Download Web artifact
+        uses: actions/download-artifact@v4
         with:
           name: web-build
           path: build/web/
@@ -106,6 +114,17 @@ jobs:
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: build/android/
+
+  deploy-android:
+    name: Deploy Android to itch.io
+    runs-on: ubuntu-latest
+    needs: export-android
+    steps:
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
         with:
           name: android-build
           path: build/android/
