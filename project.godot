@@ -6,7 +6,7 @@
 
 config/name="Mining Game"
 run/main_scene="res://scenes/town/town.tscn"
-config/features=PackedStringArray("4.2", "Forward+")
+config/features=PackedStringArray("4.2", "GL Compatibility")
 
 [autoload]
 
