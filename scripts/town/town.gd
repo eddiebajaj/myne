@@ -13,8 +13,18 @@ extends Node2D
 @onready var hud_root: Control = $CanvasLayer/HUD
 
 var mine_entrance_in_range: bool = false
+var mine_panel_open: bool = false
+var selected_checkpoint: int = 0
 var town_gold_label: Label = null
 var town_battery_label: Label = null
+
+# Mine entrance panel (built programmatically in _build_mine_panel).
+var mine_panel_layer: CanvasLayer = null
+var mine_panel_dim: ColorRect = null
+var mine_panel: PanelContainer = null
+var mine_panel_options: VBoxContainer = null
+var mine_panel_enter_button: Button = null
+var mine_panel_option_buttons: Array[Button] = []
 
 
 func _ready() -> void:
@@ -22,27 +32,21 @@ func _ready() -> void:
 	get_tree().paused = false
 	player.add_to_group("player")
 	player.position = Vector2(640, 500)
-	mine_button.pressed.connect(_on_start_mining)
-	sell_button.pressed.connect(_on_sell_ore)
-	mine_entrance.body_entered.connect(func(body):
-		if body is Player:
-			mine_entrance_in_range = true
-			mine_button.visible = true
-			checkpoint_selector.visible = true
-	)
-	mine_entrance.body_exited.connect(func(body):
-		if body is Player:
-			mine_entrance_in_range = false
-			mine_button.visible = false
-			checkpoint_selector.visible = false
-	)
+	# Legacy HUD widgets are replaced by the mine entrance panel — hide and ignore them.
 	mine_button.visible = false
+	mine_button.process_mode = Node.PROCESS_MODE_DISABLED
 	checkpoint_selector.visible = false
+	checkpoint_selector.process_mode = Node.PROCESS_MODE_DISABLED
+	sell_button.pressed.connect(_on_sell_ore)
 	sell_result.visible = false
+	mine_entrance.body_entered.connect(_on_mine_entrance_entered)
+	mine_entrance.body_exited.connect(_on_mine_entrance_exited)
 	_build_town_hud()
+	_build_mine_panel()
 	GameManager.gold_changed.connect(_on_gold_changed)
+	GameManager.checkpoint_reached.connect(_on_checkpoint_reached)
 	Inventory.inventory_changed.connect(_refresh_persistent_hud)
-	_refresh_ui()
+	_refresh_stats()
 
 
 func _build_town_hud() -> void:
@@ -80,6 +84,158 @@ func _build_town_hud() -> void:
 	_refresh_persistent_hud()
 
 
+func _build_mine_panel() -> void:
+	## Mine entrance panel — opens when player presses interact near the entrance.
+	## Mirrors NPC menu pattern (npc_smith.gd): CanvasLayer + PanelContainer, pauses game while open.
+	mine_panel_layer = CanvasLayer.new()
+	mine_panel_layer.name = "MinePanelLayer"
+	mine_panel_layer.layer = 50
+	mine_panel_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(mine_panel_layer)
+
+	mine_panel_dim = ColorRect.new()
+	mine_panel_dim.color = Color(0, 0, 0, 0.55)
+	mine_panel_dim.anchor_right = 1.0
+	mine_panel_dim.anchor_bottom = 1.0
+	mine_panel_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	mine_panel_layer.add_child(mine_panel_dim)
+
+	mine_panel = PanelContainer.new()
+	mine_panel.anchor_left = 0.5
+	mine_panel.anchor_top = 0.5
+	mine_panel.anchor_right = 0.5
+	mine_panel.anchor_bottom = 0.5
+	mine_panel.custom_minimum_size = Vector2(440, 0)
+	mine_panel_layer.add_child(mine_panel)
+
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	mine_panel.add_child(vbox)
+
+	var title: Label = Label.new()
+	title.text = "MINE ENTRANCE"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 28)
+	vbox.add_child(title)
+
+	var sep: HSeparator = HSeparator.new()
+	vbox.add_child(sep)
+
+	var prompt: Label = Label.new()
+	prompt.text = "Select starting floor:"
+	vbox.add_child(prompt)
+
+	mine_panel_options = VBoxContainer.new()
+	mine_panel_options.add_theme_constant_override("separation", 4)
+	vbox.add_child(mine_panel_options)
+
+	var sep2: HSeparator = HSeparator.new()
+	vbox.add_child(sep2)
+
+	mine_panel_enter_button = Button.new()
+	mine_panel_enter_button.text = "Enter Mine"
+	mine_panel_enter_button.add_theme_font_size_override("font_size", 22)
+	mine_panel_enter_button.pressed.connect(_on_mine_panel_enter)
+	vbox.add_child(mine_panel_enter_button)
+
+	var close_button: Button = Button.new()
+	close_button.text = "Close"
+	close_button.pressed.connect(_close_mine_panel)
+	vbox.add_child(close_button)
+
+	# Panel must keep running while the scene is paused.
+	mine_panel_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	mine_panel.visible = false
+	mine_panel_dim.visible = false
+
+	# Reposition to center after it's had a layout pass.
+	mine_panel.pivot_offset = mine_panel.size / 2.0
+	mine_panel.offset_left = -220
+	mine_panel.offset_top = -200
+	mine_panel.offset_right = 220
+	mine_panel.offset_bottom = 200
+
+
+func _refresh_mine_panel_options() -> void:
+	## Rebuild the checkpoint option buttons. Only called on open + checkpoint unlock.
+	for btn in mine_panel_option_buttons:
+		btn.queue_free()
+	mine_panel_option_buttons.clear()
+	var checkpoints: Array[int] = GameManager.get_unlocked_checkpoints()
+	# Validate stored selection; default to 0 (B1F) if stale.
+	if not checkpoints.has(selected_checkpoint):
+		selected_checkpoint = 0
+	for cp in checkpoints:
+		var btn: Button = Button.new()
+		if cp == 0:
+			btn.text = "Start from B1F"
+		else:
+			btn.text = "Warp to B%dF" % cp
+		btn.toggle_mode = true
+		btn.button_pressed = (cp == selected_checkpoint)
+		var cp_captured: int = cp
+		btn.pressed.connect(func() -> void:
+			selected_checkpoint = cp_captured
+			_update_mine_panel_selection_visuals()
+		)
+		mine_panel_options.add_child(btn)
+		mine_panel_option_buttons.append(btn)
+	_update_mine_panel_selection_visuals()
+
+
+func _update_mine_panel_selection_visuals() -> void:
+	var checkpoints: Array[int] = GameManager.get_unlocked_checkpoints()
+	for i in range(mine_panel_option_buttons.size()):
+		var cp: int = checkpoints[i]
+		mine_panel_option_buttons[i].button_pressed = (cp == selected_checkpoint)
+
+
+func _open_mine_panel() -> void:
+	if mine_panel_open:
+		return
+	mine_panel_open = true
+	_refresh_mine_panel_options()
+	mine_panel.visible = true
+	mine_panel_dim.visible = true
+	get_tree().paused = true
+
+
+func _close_mine_panel() -> void:
+	if not mine_panel_open:
+		return
+	mine_panel_open = false
+	mine_panel.visible = false
+	mine_panel_dim.visible = false
+	get_tree().paused = false
+
+
+func _on_mine_panel_enter() -> void:
+	var cp: int = selected_checkpoint
+	# Unpause before scene change so the new scene starts clean.
+	mine_panel_open = false
+	mine_panel.visible = false
+	mine_panel_dim.visible = false
+	get_tree().paused = false
+	GameManager.start_run(cp)
+
+
+func _on_mine_entrance_entered(body: Node2D) -> void:
+	if body is Player:
+		mine_entrance_in_range = true
+
+
+func _on_mine_entrance_exited(body: Node2D) -> void:
+	if body is Player:
+		mine_entrance_in_range = false
+		if mine_panel_open:
+			_close_mine_panel()
+
+
+func _on_checkpoint_reached(_floor_num: int) -> void:
+	if mine_panel_open:
+		_refresh_mine_panel_options()
+
+
 func _on_gold_changed(_new_gold: int) -> void:
 	_refresh_persistent_hud()
 
@@ -91,16 +247,11 @@ func _refresh_persistent_hud() -> void:
 		town_battery_label.text = "Bat x %d" % Inventory.batteries
 
 
-func _refresh_ui() -> void:
-	var ore_count := Inventory.get_used_slots()
+func _refresh_stats() -> void:
+	## Cheap stats-only refresh — safe to call every frame.
+	var ore_count: int = Inventory.get_used_slots()
 	stats_label.text = "Gold: %d | Ore: %d | Batteries: %d | Runs: %d | Deepest: B%dF" % [
 		GameManager.gold, ore_count, Inventory.batteries, GameManager.total_runs, GameManager.deepest_checkpoint]
-	checkpoint_selector.clear()
-	checkpoint_selector.add_item("Start from B1F", 0)
-	for cp in GameManager.get_unlocked_checkpoints():
-		if cp > 0:
-			checkpoint_selector.add_item("Warp to B%dF" % (cp + 1), cp)
-	# Show sell button if player has ore
 	sell_button.visible = ore_count > 0
 	sell_button.text = "Sell All Ore (%d pieces)" % ore_count
 
@@ -108,24 +259,22 @@ func _refresh_ui() -> void:
 func _process(_delta: float) -> void:
 	# Refresh stats periodically (after NPC interactions)
 	if Engine.get_physics_frames() % 30 == 0:
-		_refresh_ui()
-
-
-func _on_start_mining() -> void:
-	var selected := checkpoint_selector.get_selected_id()
-	GameManager.start_run(selected)
+		_refresh_stats()
+	# Mine entrance interaction — match NPC menu pattern.
+	if mine_entrance_in_range and not mine_panel_open and Input.is_action_just_pressed("interact"):
+		_open_mine_panel()
 
 
 func _on_sell_ore() -> void:
-	var earned := Inventory.sell_all()
+	var earned: int = Inventory.sell_all()
 	if earned > 0:
 		sell_result.text = "Sold for %d gold!" % earned
 		sell_result.visible = true
-		var tween := create_tween()
+		var tween: Tween = create_tween()
 		tween.tween_interval(2.0)
 		tween.tween_property(sell_result, "modulate:a", 0.0, 0.5)
-		tween.tween_callback(func():
+		tween.tween_callback(func() -> void:
 			sell_result.visible = false
 			sell_result.modulate.a = 1.0
 		)
-	_refresh_ui()
+	_refresh_stats()

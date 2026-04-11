@@ -17,6 +17,7 @@ var cave_scene: PackedScene
 var stairs_scene: PackedScene
 var rock_scene: PackedScene
 var floor_time: float = 0.0  # Track time on floor for rock portal trigger
+var _occupied_positions: Array[Dictionary] = []  # Each entry: {"pos": Vector2, "radius": float}
 
 @onready var walls: Node2D = $Walls
 @onready var ore_container: Node2D = $OreNodes
@@ -36,9 +37,12 @@ func _process(delta: float) -> void:
 
 func generate_floor() -> void:
 	floor_time = 0.0
+	_occupied_positions.clear()
 	_create_walls()
-	_spawn_ore_nodes()
+	# Register stairs-up first (fixed position) so nothing else lands on it.
+	_occupied_positions.append({"pos": Vector2(80, 80), "radius": 60.0})
 	_spawn_stairs_up()
+	_spawn_ore_nodes()
 	_spawn_rocks()
 	_spawn_floor_wanderers()
 	if randf() < GameManager.get_cave_chance():
@@ -64,7 +68,7 @@ func _spawn_ore_nodes() -> void:
 			mineral_roll += 0.15
 		if randf() < mineral_roll:
 			mineral = all_minerals[randi() % all_minerals.size()]
-		var pos := _random_floor_position(60.0)
+		var pos: Vector2 = _reserve_position(60.0, 40.0)
 		spawn_ore_node_at(pos, ore, mineral)
 
 
@@ -142,7 +146,7 @@ func _spawn_rocks() -> void:
 	rock_types.shuffle()
 	# Spawn rocks spread across the floor
 	for i in range(rock_types.size()):
-		var pos := _random_floor_position(50.0)
+		var pos: Vector2 = _reserve_position(50.0, 38.0)
 		var rock: StaticBody2D = rock_scene.instantiate()
 		rock.global_position = pos
 		rock.rock_content = rock_types[i]
@@ -173,6 +177,8 @@ func get_rock_portal_chance() -> float:
 
 func spawn_rock_triggered_portal(pos: Vector2) -> void:
 	## Rock-triggered portal: shorter warning (1.5s), spawns a single wave.
+	## Spawns at the rock's old position (rock was just destroyed) — no collision check
+	## needed since the rock freed its slot.
 	var portal: Node2D = portal_scene.instantiate()
 	portal.position = pos + Vector2(randf_range(-40, 40), randf_range(-40, 40))
 	# Override to rock-triggered behavior
@@ -184,7 +190,7 @@ func spawn_rock_triggered_portal(pos: Vector2) -> void:
 
 func _spawn_cave() -> void:
 	var cave: Area2D = cave_scene.instantiate()
-	cave.position = _random_floor_position(100.0)
+	cave.position = _reserve_position(100.0, 80.0)
 	entities.add_child(cave)
 
 
@@ -192,7 +198,7 @@ func _spawn_cave() -> void:
 
 func _spawn_portal() -> void:
 	var portal: Node2D = portal_scene.instantiate()
-	portal.position = _random_floor_position(80.0)
+	portal.position = _reserve_position(80.0, 50.0)
 	entities.add_child(portal)
 
 
@@ -286,10 +292,11 @@ func _spawn_floor_wanderers() -> void:
 
 func _roll_wanderer_position(player_spawn: Vector2, placed: Array[Vector2]) -> Vector2:
 	## Rejection-roll a wanderer spawn position: 300-650 px from player,
-	## >=120 px from other wanderers, not too close to walls. 5 retries then accept.
-	var best: Vector2 = _random_floor_position(60.0)
+	## >=120 px from other wanderers, not too close to walls or other entities.
+	## 5 retries then accept.
+	var best: Vector2 = _reserve_position(60.0, 50.0)
 	for attempt in range(5):
-		var candidate: Vector2 = _random_floor_position(60.0)
+		var candidate: Vector2 = _reserve_position(60.0, 50.0)
 		var d_player: float = candidate.distance_to(player_spawn)
 		if d_player < 300.0 or d_player > 650.0:
 			continue
@@ -375,6 +382,26 @@ func _random_floor_position(margin: float) -> Vector2:
 		randf_range(WALL_THICKNESS + margin, FLOOR_WIDTH - WALL_THICKNESS - margin),
 		randf_range(WALL_THICKNESS + margin, FLOOR_HEIGHT - WALL_THICKNESS - margin)
 	)
+
+
+func _reserve_position(margin: float, min_separation: float, max_attempts: int = 20) -> Vector2:
+	## Rejection-sample a floor position that is at least min_separation + other.radius
+	## away from every previously-reserved entity. Returns the last candidate if all
+	## attempts fail (no infinite loop). Registers the chosen position in the occupied list.
+	var candidate: Vector2 = _random_floor_position(margin)
+	for attempt in range(max_attempts):
+		candidate = _random_floor_position(margin)
+		var ok: bool = true
+		for entry in _occupied_positions:
+			var other_pos: Vector2 = entry["pos"]
+			var other_radius: float = entry["radius"]
+			if candidate.distance_to(other_pos) < (min_separation + other_radius):
+				ok = false
+				break
+		if ok:
+			break
+	_occupied_positions.append({"pos": candidate, "radius": min_separation})
+	return candidate
 
 
 # === Ore type definitions (8 ores, 4 tiers) ===

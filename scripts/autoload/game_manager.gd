@@ -51,7 +51,8 @@ func start_run(from_checkpoint: int = 0) -> void:
 		return
 	current_state = GameState.TRANSITIONING
 	total_runs += 1
-	run_start_floor = from_checkpoint + 1 if from_checkpoint > 0 else 1
+	# Checkpoint warp restarts AT the checkpoint floor (B5, B10, ...), not the one after.
+	run_start_floor = from_checkpoint if from_checkpoint > 0 else 1
 	current_floor = run_start_floor
 	Inventory.begin_run()
 	get_tree().change_scene_to_file("res://scenes/dungeon/mining_floor.tscn")
