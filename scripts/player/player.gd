@@ -13,8 +13,8 @@ const BASE_PICKAXE_DAMAGE := 3.0       # Low — you're a miner
 
 enum DamageType { PHYSICAL, VENOM }
 
-var max_health: float = 50.0           # Fixed — ~8-10 hits from enemies
-var health: float = 50.0
+var max_health: float = 12.0           # Fixed — nerfed to ~2-3 hits from enemies (sprint 2c)
+var health: float = 12.0
 var max_armor: float = 0.0             # From equipment (Smith / cave loot)
 var armor: float = 0.0                 # Absorbs physical damage before HP. Venom bypasses.
 var pickaxe_tier: int = 1              # 1-4, determines hits-to-break via lookup table

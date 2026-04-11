@@ -18,6 +18,7 @@ var stairs_scene: PackedScene
 var rock_scene: PackedScene
 var floor_time: float = 0.0  # Track time on floor for rock portal trigger
 var _occupied_positions: Array[Dictionary] = []  # Each entry: {"pos": Vector2, "radius": float}
+var stairs_up_position: Vector2 = Vector2.ZERO  # Set by _spawn_stairs_up(); consumed by controller + wanderer spawner
 
 @onready var walls: Node2D = $Walls
 @onready var ore_container: Node2D = $OreNodes
@@ -39,8 +40,7 @@ func generate_floor() -> void:
 	floor_time = 0.0
 	_occupied_positions.clear()
 	_create_walls()
-	# Register stairs-up first (fixed position) so nothing else lands on it.
-	_occupied_positions.append({"pos": Vector2(80, 80), "radius": 60.0})
+	# Stairs-up first so it reserves its slot before anything else claims it.
 	_spawn_stairs_up()
 	_spawn_ore_nodes()
 	_spawn_rocks()
@@ -114,10 +114,12 @@ func get_rare_ores() -> Array[OreData]:
 # === Stairs ===
 
 func _spawn_stairs_up() -> void:
-	## Stairs up are always visible from the start.
+	## Stairs up are always visible from the start. Randomized position (sprint 2c).
 	var up: Area2D = stairs_scene.instantiate()
 	up.stair_type = Stairs.StairType.UP
-	up.position = Vector2(80, 80)
+	var pos: Vector2 = _reserve_position(80.0, 80.0)
+	up.position = pos
+	stairs_up_position = pos
 	entities.add_child(up)
 
 
@@ -282,7 +284,8 @@ func _spawn_floor_wanderers() -> void:
 	if not T1_WANDERER_COMPOSITIONS.has(floor_num):
 		return
 	var comp: Array = T1_WANDERER_COMPOSITIONS[floor_num]
-	var player_spawn := Vector2(80, 80)
+	# Wanderers must stay away from the player's spawn (which is the stairs-up).
+	var player_spawn: Vector2 = stairs_up_position
 	var placed: Array[Vector2] = []
 	for id in comp:
 		var pos: Vector2 = _roll_wanderer_position(player_spawn, placed)

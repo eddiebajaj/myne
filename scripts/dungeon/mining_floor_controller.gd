@@ -12,8 +12,9 @@ func _ready() -> void:
 	# Ensure game is not paused (in case we came from a paused build menu)
 	get_tree().paused = false
 	player.add_to_group("player")
-	# Position player near stairs up
-	player.position = Vector2(120, 120)
+	# Position player near stairs up (randomized per sprint 2c). Offset slightly
+	# downward so the player doesn't overlap the stair collider on spawn.
+	player.position = floor_generator.stairs_up_position + Vector2(0, 40)
 	# Wire up HUD
 	hud.set_player(player)
 	hud.set_bot_placer(bot_placer)

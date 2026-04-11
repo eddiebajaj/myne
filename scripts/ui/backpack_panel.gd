@@ -11,8 +11,14 @@ const PANEL_H: int = 640
 const VIEWPORT_W: int = 1280
 const VIEWPORT_H: int = 720
 
+const INSPECT_BUTTON_MIN_H: int = 64
+
 var _is_open: bool = false
 var _cell_size: int = CELL_SIZE_DESKTOP
+var _inspect_popup: PanelContainer = null
+var _inspect_dim: ColorRect = null
+var _inspect_ore_id: String = ""
+var _inspect_mineral_id: String = ""
 
 @onready var root_control: Control = $Root
 @onready var panel: PanelContainer = $Root/Panel
@@ -69,6 +75,7 @@ func open() -> void:
 
 func close() -> void:
 	_is_open = false
+	_close_inspect_popup()
 	root_control.visible = false
 	get_tree().paused = false
 
@@ -119,7 +126,9 @@ func _build_cell(cell_data: Dictionary) -> Control:
 		style.bg_color = ore.color
 	cell.add_theme_stylebox_override("panel", style)
 	if cell_data.is_empty():
+		# Empty cells are inert — no gui_input hookup.
 		return cell
+	var ore_data: OreData = cell_data.ore
 	var mineral: MineralData = cell_data.mineral
 	if mineral != null:
 		var pip: ColorRect = ColorRect.new()
@@ -128,7 +137,190 @@ func _build_cell(cell_data: Dictionary) -> Control:
 		pip.position = Vector2(_cell_size - 20, 4)
 		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		cell.add_child(pip)
+	# Resolve per-piece cell → source stack via (ore_id, mineral_id) metadata.
+	# Inventory.drop_one() looks up the stack by this key.
+	cell.set_meta("ore_id", ore_data.id)
+	cell.set_meta("mineral_id", mineral.id if mineral != null else "")
+	cell.mouse_filter = Control.MOUSE_FILTER_STOP
+	cell.gui_input.connect(_on_cell_gui_input.bind(cell))
 	return cell
+
+
+func _on_cell_gui_input(event: InputEvent, cell: Control) -> void:
+	var is_click: bool = event is InputEventMouseButton \
+		and (event as InputEventMouseButton).pressed \
+		and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
+	var is_tap: bool = event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed
+	if not (is_click or is_tap):
+		return
+	var ore_id: String = String(cell.get_meta("ore_id", ""))
+	var mineral_id: String = String(cell.get_meta("mineral_id", ""))
+	if ore_id == "":
+		return
+	_open_inspect_popup(ore_id, mineral_id)
+	accept_event()
+
+
+func _open_inspect_popup(ore_id: String, mineral_id: String) -> void:
+	_close_inspect_popup()
+	_inspect_ore_id = ore_id
+	_inspect_mineral_id = mineral_id
+	# Dim click-catcher: tap-outside-to-dismiss.
+	_inspect_dim = ColorRect.new()
+	_inspect_dim.color = Color(0, 0, 0, 0.35)
+	_inspect_dim.anchor_right = 1.0
+	_inspect_dim.anchor_bottom = 1.0
+	_inspect_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_inspect_dim.process_mode = Node.PROCESS_MODE_ALWAYS
+	_inspect_dim.gui_input.connect(_on_dim_gui_input)
+	root_control.add_child(_inspect_dim)
+	# Popup panel, centered over backpack.
+	_inspect_popup = PanelContainer.new()
+	_inspect_popup.process_mode = Node.PROCESS_MODE_ALWAYS
+	_inspect_popup.custom_minimum_size = Vector2(360, 260)
+	_inspect_popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	var popup_style: StyleBoxFlat = StyleBoxFlat.new()
+	popup_style.bg_color = Color(0.12, 0.12, 0.16, 0.98)
+	popup_style.border_color = Color(0.7, 0.7, 0.8, 1.0)
+	popup_style.border_width_top = 2
+	popup_style.border_width_bottom = 2
+	popup_style.border_width_left = 2
+	popup_style.border_width_right = 2
+	popup_style.content_margin_left = 16
+	popup_style.content_margin_right = 16
+	popup_style.content_margin_top = 14
+	popup_style.content_margin_bottom = 14
+	_inspect_popup.add_theme_stylebox_override("panel", popup_style)
+	root_control.add_child(_inspect_popup)
+	_populate_inspect_popup()
+	_center_inspect_popup()
+
+
+func _populate_inspect_popup() -> void:
+	if _inspect_popup == null:
+		return
+	for child in _inspect_popup.get_children():
+		child.queue_free()
+	var slot: Dictionary = _find_stack(_inspect_ore_id, _inspect_mineral_id)
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_inspect_popup.add_child(vbox)
+	if slot.is_empty():
+		var gone_label: Label = Label.new()
+		gone_label.text = "(stack empty)"
+		vbox.add_child(gone_label)
+		var close_only: Button = Button.new()
+		close_only.text = "Close"
+		close_only.custom_minimum_size = Vector2(0, INSPECT_BUTTON_MIN_H)
+		close_only.pressed.connect(_close_inspect_popup)
+		vbox.add_child(close_only)
+		return
+	var ore: OreData = slot.ore
+	var mineral: MineralData = slot.mineral
+	var qty: int = int(slot.quantity)
+	var title: Label = Label.new()
+	title.text = ore.display_name + " Ore"
+	title.add_theme_font_size_override("font_size", 22)
+	vbox.add_child(title)
+	var tier_label: Label = Label.new()
+	tier_label.text = "Tier %d    x%d" % [ore.tier, qty]
+	vbox.add_child(tier_label)
+	if mineral != null:
+		var mineral_label: Label = Label.new()
+		mineral_label.text = "%s — %s" % [mineral.display_name, mineral.bot_effect_description]
+		mineral_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		mineral_label.custom_minimum_size = Vector2(320, 0)
+		vbox.add_child(mineral_label)
+	var base_value: int = ore.value
+	var mineral_bonus: int = mineral.sell_bonus if mineral != null else 0
+	var sell_text: String
+	if mineral_bonus > 0:
+		sell_text = "Sell: %d gold  (%d base + %d mineral)" % [base_value + mineral_bonus, base_value, mineral_bonus]
+	else:
+		sell_text = "Sell: %d gold" % base_value
+	var sell_label: Label = Label.new()
+	sell_label.text = sell_text
+	vbox.add_child(sell_label)
+	var spacer: Control = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 8)
+	vbox.add_child(spacer)
+	var button_row: HBoxContainer = HBoxContainer.new()
+	button_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(button_row)
+	var drop_button: Button = Button.new()
+	drop_button.text = "Drop 1"
+	drop_button.custom_minimum_size = Vector2(140, INSPECT_BUTTON_MIN_H)
+	drop_button.pressed.connect(_on_drop_pressed)
+	button_row.add_child(drop_button)
+	var close_button_inner: Button = Button.new()
+	close_button_inner.text = "Close"
+	close_button_inner.custom_minimum_size = Vector2(140, INSPECT_BUTTON_MIN_H)
+	close_button_inner.pressed.connect(_close_inspect_popup)
+	button_row.add_child(close_button_inner)
+
+
+func _center_inspect_popup() -> void:
+	if _inspect_popup == null:
+		return
+	# Re-center against the backpack panel once layout has resolved.
+	await get_tree().process_frame
+	if _inspect_popup == null:
+		return
+	var panel_rect: Rect2 = panel.get_global_rect()
+	var popup_size: Vector2 = _inspect_popup.size
+	if popup_size == Vector2.ZERO:
+		popup_size = _inspect_popup.custom_minimum_size
+	var origin: Vector2 = panel_rect.position + (panel_rect.size - popup_size) * 0.5
+	_inspect_popup.position = origin
+
+
+func _find_stack(ore_id: String, mineral_id: String) -> Dictionary:
+	for slot in Inventory.get_ore_stacks():
+		var this_ore: OreData = slot.ore
+		var this_mineral: MineralData = slot.mineral
+		var this_mineral_id: String = this_mineral.id if this_mineral != null else ""
+		if this_ore.id == ore_id and this_mineral_id == mineral_id:
+			return slot
+	return {}
+
+
+func _on_drop_pressed() -> void:
+	if _inspect_ore_id == "":
+		return
+	var ok: bool = Inventory.drop_one(_inspect_ore_id, _inspect_mineral_id)
+	if not ok:
+		_close_inspect_popup()
+		return
+	# Refresh grid (Inventory.inventory_changed already fires via drop_one,
+	# but _refresh is idempotent and keeps popup+grid coherent).
+	_refresh_grid()
+	_refresh_header()
+	# If stack is now empty, close popup; otherwise repopulate so qty updates.
+	var remaining: int = Inventory.get_stack_quantity(_inspect_ore_id, _inspect_mineral_id)
+	if remaining <= 0:
+		_close_inspect_popup()
+	else:
+		_populate_inspect_popup()
+
+
+func _on_dim_gui_input(event: InputEvent) -> void:
+	var is_click: bool = event is InputEventMouseButton \
+		and (event as InputEventMouseButton).pressed \
+		and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
+	var is_tap: bool = event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed
+	if is_click or is_tap:
+		_close_inspect_popup()
+
+
+func _close_inspect_popup() -> void:
+	if _inspect_popup != null:
+		_inspect_popup.queue_free()
+		_inspect_popup = null
+	if _inspect_dim != null:
+		_inspect_dim.queue_free()
+		_inspect_dim = null
+	_inspect_ore_id = ""
+	_inspect_mineral_id = ""
 
 
 func _refresh_side_panel() -> void:

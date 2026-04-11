@@ -19,7 +19,7 @@ var total_runs: int = 0
 # --- Run-persistent player vitals ---
 # These survive scene reloads (e.g. descending stairs rebuilds mining_floor.tscn).
 # Player._ready() reads from these; take_damage() writes back.
-const DEFAULT_MAX_HEALTH := 50.0
+const DEFAULT_MAX_HEALTH := 12.0
 var run_health: float = DEFAULT_MAX_HEALTH
 var run_max_health: float = DEFAULT_MAX_HEALTH
 var run_armor: float = 0.0

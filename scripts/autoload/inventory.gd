@@ -106,6 +106,34 @@ func spend_ore_specific(ore_id: String, mineral_id: String, count: int) -> bool:
 	return false
 
 
+func drop_one(ore_id: String, mineral_id: String) -> bool:
+	## Drops exactly one piece from the matching stack. Returns true on success.
+	## If the stack quantity hits 0 the slot is removed from carried_ore.
+	var key: String = ore_id
+	if mineral_id != "":
+		key = ore_id + ":" + mineral_id
+	for slot in carried_ore:
+		var slot_key: String = _get_slot_key(slot.ore, slot.mineral)
+		if slot_key == key and int(slot.quantity) >= 1:
+			slot.quantity -= 1
+			if int(slot.quantity) <= 0:
+				carried_ore.erase(slot)
+			inventory_changed.emit()
+			return true
+	return false
+
+
+func get_stack_quantity(ore_id: String, mineral_id: String) -> int:
+	## Returns the current quantity for a given ore+mineral stack, or 0 if no such stack.
+	var key: String = ore_id
+	if mineral_id != "":
+		key = ore_id + ":" + mineral_id
+	for slot in carried_ore:
+		if _get_slot_key(slot.ore, slot.mineral) == key:
+			return int(slot.quantity)
+	return 0
+
+
 func sell_all() -> int:
 	var total_gold := 0
 	for slot in carried_ore:
