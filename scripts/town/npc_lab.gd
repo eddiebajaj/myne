@@ -61,6 +61,29 @@ func _refresh_ui() -> void:
 	# Services
 	for child in services_container.get_children():
 		child.queue_free()
+	# Section: Battery Crafting — spec §4.3 (no gold fee per Eddie)
+	var header_batt: Label = Label.new()
+	header_batt.text = "— BATTERY CRAFTING —"
+	services_container.add_child(header_batt)
+	var recipe_lbl: Label = Label.new()
+	recipe_lbl.text = "Basic Battery\nRequires: 3 x T1 plain ore"
+	services_container.add_child(recipe_lbl)
+	var plain_t1: int = Inventory.count_plain_t1_ore()
+	var have_lbl: Label = Label.new()
+	have_lbl.text = "Have: %d T1 ore, %dg" % [plain_t1, GameManager.gold]
+	services_container.add_child(have_lbl)
+	var craft_btn: Button = Button.new()
+	craft_btn.text = "Craft Battery"
+	craft_btn.disabled = plain_t1 < 3
+	craft_btn.pressed.connect(func():
+		if Inventory.craft_battery():
+			result_label.text = "Crafted 1 Basic Battery!"
+			_refresh_ui()
+		else:
+			result_label.text = "Requires 3 plain T1 ore."
+	)
+	services_container.add_child(craft_btn)
+
 	# Section: Extract (mineral ore → plain ore + stored mineral)
 	var header_extract := Label.new()
 	header_extract.text = "— EXTRACT (%d gold) —" % EXTRACT_COST
@@ -113,10 +136,7 @@ func _refresh_ui() -> void:
 						_refresh_ui()
 			)
 			services_container.add_child(btn)
-	if services_container.get_child_count() <= 2:
-		var empty := Label.new()
-		empty.text = "(No materials available)"
-		services_container.add_child(empty)
+	# Note: battery crafting adds ~4 children baseline, extract/infuse add more.
 
 
 func _on_body_entered(body: Node2D) -> void:

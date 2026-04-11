@@ -7,6 +7,7 @@ signal state_changed(new_state: GameState)
 signal floor_changed(floor_num: int)
 signal checkpoint_reached(floor_num: int)
 signal player_died
+signal gold_changed(new_gold: int)
 
 var current_state: GameState = GameState.TOWN
 var current_floor: int = 1
@@ -96,11 +97,13 @@ func die() -> void:
 
 func add_gold(amount: int) -> void:
 	gold += amount
+	gold_changed.emit(gold)
 
 
 func spend_gold(amount: int) -> bool:
 	if gold >= amount:
 		gold -= amount
+		gold_changed.emit(gold)
 		return true
 	return false
 

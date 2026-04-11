@@ -10,8 +10,11 @@ extends Node2D
 @onready var mine_button: Button = $CanvasLayer/HUD/MineButton
 @onready var sell_button: Button = $CanvasLayer/HUD/SellButton
 @onready var sell_result: Label = $CanvasLayer/HUD/SellResult
+@onready var hud_root: Control = $CanvasLayer/HUD
 
 var mine_entrance_in_range: bool = false
+var town_gold_label: Label = null
+var town_battery_label: Label = null
 
 
 func _ready() -> void:
@@ -36,7 +39,55 @@ func _ready() -> void:
 	mine_button.visible = false
 	checkpoint_selector.visible = false
 	sell_result.visible = false
+	_build_town_hud()
+	GameManager.gold_changed.connect(_on_gold_changed)
+	Inventory.inventory_changed.connect(_refresh_persistent_hud)
 	_refresh_ui()
+
+
+func _build_town_hud() -> void:
+	## Persistent top-right HBox: battery count + gold — spec §6.
+	var hbox: HBoxContainer = HBoxContainer.new()
+	hbox.name = "PersistentHUD"
+	hbox.position = Vector2(1280.0 - 280.0, 16.0)
+	hbox.size = Vector2(264.0, 32.0)
+	hud_root.add_child(hbox)
+	town_battery_label = Label.new()
+	town_battery_label.text = "Bat x 0"
+	town_battery_label.add_theme_font_size_override("font_size", 24)
+	town_battery_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	town_battery_label.add_theme_constant_override("outline_size", 2)
+	town_battery_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	hbox.add_child(town_battery_label)
+	var spacer: Control = Control.new()
+	spacer.custom_minimum_size = Vector2(16, 0)
+	hbox.add_child(spacer)
+	var coin: ColorRect = ColorRect.new()
+	coin.color = Color(1.0, 0.85, 0.2)
+	coin.custom_minimum_size = Vector2(24, 24)
+	hbox.add_child(coin)
+	var gap: Control = Control.new()
+	gap.custom_minimum_size = Vector2(6, 0)
+	hbox.add_child(gap)
+	town_gold_label = Label.new()
+	town_gold_label.text = "0"
+	town_gold_label.add_theme_font_size_override("font_size", 24)
+	town_gold_label.add_theme_color_override("font_color", Color(1, 1, 1))
+	town_gold_label.add_theme_constant_override("outline_size", 2)
+	town_gold_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	hbox.add_child(town_gold_label)
+	_refresh_persistent_hud()
+
+
+func _on_gold_changed(_new_gold: int) -> void:
+	_refresh_persistent_hud()
+
+
+func _refresh_persistent_hud() -> void:
+	if town_gold_label:
+		town_gold_label.text = "%d" % GameManager.gold
+	if town_battery_label:
+		town_battery_label.text = "Bat x %d" % Inventory.batteries
 
 
 func _refresh_ui() -> void:

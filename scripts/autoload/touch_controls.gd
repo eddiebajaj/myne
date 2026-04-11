@@ -40,6 +40,65 @@ func _build_ui() -> void:
 
 	_build_dpad(root_control)
 	_build_action_buttons(root_control)
+	_build_backpack_button(root_control)
+
+
+# === Backpack toggle button (top-right, 72x72, mobile only) ===
+func _build_backpack_button(parent: Control) -> void:
+	var size: int = 72
+	var pos: Vector2 = Vector2(float(VIEWPORT_W) - size - 16.0, 16.0)
+	var panel: Panel = Panel.new()
+	panel.name = "Btn_toggle_backpack"
+	panel.position = pos
+	panel.size = Vector2(size, size)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.2, 0.2, 0.3, BUTTON_ALPHA)
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.border_color = Color(0.8, 0.8, 0.9, BUTTON_ALPHA)
+	panel.add_theme_stylebox_override("panel", style)
+	var label: Label = Label.new()
+	label.text = "Bag"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.size = Vector2(size, size)
+	label.add_theme_font_size_override("font_size", 22)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(label)
+	panel.set_meta("action_name", "toggle_backpack")
+	panel.gui_input.connect(_on_backpack_btn_input.bind(panel))
+	parent.add_child(panel)
+
+
+func _on_backpack_btn_input(event: InputEvent, panel: Panel) -> void:
+	var is_press: bool = false
+	if event is InputEventScreenTouch:
+		var t: InputEventScreenTouch = event
+		is_press = t.pressed
+		panel.accept_event()
+	elif event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		is_press = mb.pressed
+		panel.accept_event()
+	else:
+		return
+	if is_press:
+		panel.modulate = Color(1.2, 1.2, 1.4, 1.0)
+		var bp: Node = get_node_or_null("/root/BackpackPanel")
+		if bp and bp.has_method("toggle"):
+			bp.call("toggle")
+	else:
+		panel.modulate = Color(1, 1, 1, 1)
 
 
 # === D-Pad ===

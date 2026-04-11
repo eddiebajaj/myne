@@ -122,6 +122,45 @@ func get_total_items() -> int:
 	return get_used_slots()
 
 
+func count_plain_t1_ore() -> int:
+	## Counts total pieces of plain (mineral == null) T1 ore across all stacks.
+	var total: int = 0
+	for slot in carried_ore:
+		if slot.mineral == null and slot.ore.tier == 1:
+			total += int(slot.quantity)
+	return total
+
+
+func craft_battery() -> bool:
+	## Consumes 3 plain T1 ore (mixable across types) and adds 1 battery.
+	## Prefers spending from smallest stacks first to consolidate inventory.
+	## Returns false if player lacks 3 plain T1 ore.
+	if count_plain_t1_ore() < 3:
+		return false
+	# Build list of plain T1 slots, sorted smallest-first
+	var plain_slots: Array[Dictionary] = []
+	for slot in carried_ore:
+		if slot.mineral == null and slot.ore.tier == 1:
+			plain_slots.append(slot)
+	plain_slots.sort_custom(func(a, b): return int(a.quantity) < int(b.quantity))
+	var remaining: int = 3
+	for slot in plain_slots:
+		if remaining <= 0:
+			break
+		var take: int = mini(int(slot.quantity), remaining)
+		slot.quantity -= take
+		remaining -= take
+	# Remove any emptied slots
+	var i: int = carried_ore.size() - 1
+	while i >= 0:
+		if int(carried_ore[i].quantity) <= 0:
+			carried_ore.remove_at(i)
+		i -= 1
+	batteries += 1
+	inventory_changed.emit()
+	return true
+
+
 func get_ore_stacks() -> Array[Dictionary]:
 	## Returns all ore stacks for UI display.
 	return carried_ore

@@ -5,17 +5,18 @@ extends Area2D
 var player_in_range: bool = false
 var menu_open: bool = false
 
-# Pickaxe upgrade costs per tier (tier 1→2, 2→3, 3→4)
-const PICKAXE_COSTS: Array[int] = [0, 25, 60, 150]
-# Armor tier values and costs
+# Pickaxe upgrade costs per tier (tier 1→2, 2→3, 3→4) — spec §3.1
+const PICKAXE_COSTS: Array[int] = [0, 40, 120, 320]
+# Armor tier values and costs — spec §3.2
 const ARMOR_TIERS: Array[Dictionary] = [
-	{"name": "Leather Armor", "armor": 10.0, "cost": 20},
-	{"name": "Chain Armor", "armor": 20.0, "cost": 50},
-	{"name": "Plate Armor", "armor": 35.0, "cost": 100},
-	{"name": "Crystal Armor", "armor": 50.0, "cost": 200},
+	{"name": "Leather Armor", "armor": 10.0, "cost": 30},
+	{"name": "Chain Armor", "armor": 20.0, "cost": 90},
+	{"name": "Plate Armor", "armor": 35.0, "cost": 220},
+	{"name": "Crystal Armor", "armor": 55.0, "cost": 500},
 ]
-const ARMOR_REPAIR_COST_PER_POINT := 1
-const BACKPACK_ROW_COST := 30
+# Backpack row costs (row 5, 6, 7, 8) — spec §3.3
+const BACKPACK_ROW_COSTS: Array[int] = [60, 150, 320, 600]
+const MAX_EXTRA_ROWS: int = 4
 
 @onready var sprite: ColorRect = $Sprite
 @onready var label: Label = $Label
@@ -54,58 +55,91 @@ func _close_menu() -> void:
 
 
 func _refresh_ui() -> void:
-	gold_label.text = "Gold: %d" % GameManager.gold
+	gold_label.text = "Gold: %dg" % GameManager.gold
 	for child in upgrades_container.get_children():
 		child.queue_free()
-	# Pickaxe upgrade
-	var pick_tier: int = Inventory.upgrade_levels.get("pickaxe_tier", 1)
+
+	# — PICKAXE —
+	_add_header("— PICKAXE —")
+	var pick_tier: int = int(Inventory.upgrade_levels.get("pickaxe_tier", 1))
 	if pick_tier < 4:
 		var cost: int = PICKAXE_COSTS[pick_tier]
-		var btn := Button.new()
-		btn.text = "Pickaxe T%d → T%d (%d gold)" % [pick_tier, pick_tier + 1, cost]
-		btn.disabled = GameManager.gold < cost
-		btn.pressed.connect(func():
+		var desc: String = "Pickaxe T%d → T%d    %dg" % [pick_tier, pick_tier + 1, cost]
+		_add_buy_row(desc, cost, func():
 			if GameManager.spend_gold(cost):
 				Inventory.apply_upgrade("pickaxe_tier", pick_tier + 1)
 				result_label.text = "Pickaxe upgraded to T%d!" % (pick_tier + 1)
 				_refresh_ui()
 		)
-		upgrades_container.add_child(btn)
 	else:
-		var lbl := Label.new()
-		lbl.text = "Pickaxe: MAX TIER"
-		upgrades_container.add_child(lbl)
-	# Armor purchase
-	var current_armor: float = Inventory.upgrade_levels.get("armor_value", 0.0)
+		_add_max_row("Pickaxe: MAX")
+
+	# — ARMOR —
+	_add_header("— ARMOR —")
+	var current_armor: float = float(Inventory.upgrade_levels.get("armor_value", 0.0))
+	var next_armor: Dictionary = {}
 	for tier_data in ARMOR_TIERS:
-		if tier_data.armor > current_armor:
-			var btn := Button.new()
-			btn.text = "%s (Armor %d) — %d gold" % [tier_data.name, int(tier_data.armor), tier_data.cost]
-			btn.disabled = GameManager.gold < tier_data.cost
-			var td := tier_data
-			btn.pressed.connect(func():
-				if GameManager.spend_gold(td.cost):
-					Inventory.apply_upgrade("armor_value", td.armor)
-					result_label.text = "Bought %s!" % td.name
-					_refresh_ui()
-			)
-			upgrades_container.add_child(btn)
-			break  # Only show next tier
-	# Armor repair (placeholder — in actual game, armor degrades during runs)
-	# Backpack expansion
-	var extra_rows: int = Inventory.upgrade_levels.get("grid_rows", 0)
-	if extra_rows < 4:
-		var cost := BACKPACK_ROW_COST * (extra_rows + 1)
-		var btn := Button.new()
-		btn.text = "Backpack +1 Row (%d gold) — Current: %dx%d" % [cost, Inventory.grid_width, Inventory.grid_height + extra_rows]
-		btn.disabled = GameManager.gold < cost
-		btn.pressed.connect(func():
+		if float(tier_data.armor) > current_armor:
+			next_armor = tier_data
+			break
+	if next_armor.is_empty():
+		_add_max_row("Armor: MAX")
+	else:
+		var td: Dictionary = next_armor
+		var desc: String = "%s (Armor %d)    %dg" % [td.name, int(td.armor), int(td.cost)]
+		var cost_i: int = int(td.cost)
+		_add_buy_row(desc, cost_i, func():
+			if GameManager.spend_gold(cost_i):
+				Inventory.apply_upgrade("armor_value", float(td.armor))
+				result_label.text = "Bought %s!" % td.name
+				_refresh_ui()
+		)
+
+	# — BACKPACK —
+	_add_header("— BACKPACK —")
+	var extra_rows: int = int(Inventory.upgrade_levels.get("grid_rows", 0))
+	var current_rows: int = Inventory.grid_height + extra_rows
+	if extra_rows < MAX_EXTRA_ROWS:
+		var cost: int = BACKPACK_ROW_COSTS[extra_rows]
+		var desc: String = "%dx%d → %dx%d    %dg" % [
+			Inventory.grid_width, current_rows, Inventory.grid_width, current_rows + 1, cost]
+		_add_buy_row(desc, cost, func():
 			if GameManager.spend_gold(cost):
 				Inventory.apply_upgrade("grid_rows", extra_rows + 1)
 				result_label.text = "Backpack expanded!"
 				_refresh_ui()
 		)
-		upgrades_container.add_child(btn)
+		var current_lbl: Label = Label.new()
+		current_lbl.text = "Current: %d slots" % (Inventory.grid_width * current_rows)
+		upgrades_container.add_child(current_lbl)
+	else:
+		_add_max_row("Backpack: MAX (%d slots)" % (Inventory.grid_width * current_rows))
+
+
+func _add_header(text: String) -> void:
+	var lbl: Label = Label.new()
+	lbl.text = text
+	upgrades_container.add_child(lbl)
+
+
+func _add_max_row(text: String) -> void:
+	var lbl: Label = Label.new()
+	lbl.text = text + "  [MAX]"
+	upgrades_container.add_child(lbl)
+
+
+func _add_buy_row(desc: String, cost: int, on_buy: Callable) -> void:
+	var row: HBoxContainer = HBoxContainer.new()
+	var lbl: Label = Label.new()
+	lbl.text = desc
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(lbl)
+	var btn: Button = Button.new()
+	btn.text = "Buy"
+	btn.disabled = GameManager.gold < cost
+	btn.pressed.connect(on_buy)
+	row.add_child(btn)
+	upgrades_container.add_child(row)
 
 
 func _on_body_entered(body: Node2D) -> void:
