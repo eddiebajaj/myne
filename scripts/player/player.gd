@@ -21,6 +21,8 @@ var pickaxe_tier: int = 1              # 1-4, determines hits-to-break via looku
 var can_swing: bool = true
 var facing_dir: Vector2 = Vector2.DOWN
 var is_invulnerable: bool = false
+var _last_popup_time: float = -1.0
+var _popup_stagger_index: int = 0
 
 @onready var swing_timer: Timer = $SwingTimer
 @onready var pickaxe_area: Area2D = $PickaxeArea
@@ -73,9 +75,18 @@ func _physics_process(_delta: float) -> void:
 func swing_pickaxe() -> void:
 	can_swing = false
 	swing_timer.start()
-	# The ColorRect's rect is offset to the right of its node origin (see player.tscn),
-	# so rotating the node around its origin sweeps an arc on whichever side the
-	# player is facing.  Set the base rotation to face_dir first, then tween +90deg.
+	# Bug fix (sprint 2): the previous code rotated the ColorRect around its
+	# own pivot (0,0) which, with its offset_left=30 in player.tscn, meant the
+	# sprite spun in place to the right regardless of facing.  Instead, compute
+	# a position on a ring around the player in facing_dir and move the rect
+	# there each swing.  The rotation tween then just sweeps the rect's own
+	# angle for visual flair.
+	var swing_radius: float = 34.0
+	var base_pos: Vector2 = facing_dir * swing_radius
+	# Center the 20x8 rect on that point (half-size = 10,4).
+	pickaxe_sprite.position = base_pos - Vector2(10.0, 4.0)
+	# Set pivot to the center of the rect so rotation spins around its middle.
+	pickaxe_sprite.pivot_offset = Vector2(10.0, 4.0)
 	var base_rot: float = facing_dir.angle()
 	pickaxe_sprite.rotation = base_rot - deg_to_rad(45)
 	pickaxe_sprite.visible = true
@@ -128,6 +139,35 @@ func _update_facing_visuals() -> void:
 	# Position the nose just outside the body (14px half-extent) in facing_dir.
 	var nose_center: Vector2 = facing_dir * 18.0
 	facing_nose.position = nose_center - facing_nose.size * 0.5
+
+
+func show_pickup_popup(text: String) -> void:
+	## Small floating label that rises and fades.  Called by OrePickup on collect.
+	var label: Label = Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	label.add_theme_constant_override("outline_size", 2)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 20
+	# Stagger if multiple popups spawn in the same ~100ms window.
+	var now: float = Time.get_ticks_msec() / 1000.0
+	if now - _last_popup_time < 0.1:
+		_popup_stagger_index += 1
+	else:
+		_popup_stagger_index = 0
+	_last_popup_time = now
+	var stagger_y: float = float(_popup_stagger_index) * 12.0
+	# Rough horizontal centering (font metrics aren't known until drawn).
+	var start_offset: Vector2 = Vector2(-float(text.length()) * 3.0, -28.0 - stagger_y)
+	label.position = start_offset
+	label.modulate = Color(1, 1, 1, 1)
+	add_child(label)
+	var tween: Tween = create_tween().set_parallel(true)
+	tween.tween_property(label, "position:y", start_offset.y - 30.0, 0.6)
+	tween.tween_property(label, "modulate:a", 0.0, 0.6)
+	tween.chain().tween_callback(func(): label.queue_free())
 
 
 func _apply_upgrades() -> void:

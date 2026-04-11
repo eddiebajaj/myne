@@ -84,7 +84,11 @@ func _spawn_pickups(count: int) -> void:
 		var pickup: OrePickup = ORE_PICKUP_SCENE.instantiate()
 		pickup.setup(ore_data, mineral, origin)
 		container.add_child(pickup)
+		# Sprint 2 bug fix: previous radius (6-14) let pickups stack on one pixel,
+		# especially when multiple nodes broke near each other.  Wider ring plus a
+		# small per-pickup jitter ensures visual separation.
 		var angle: float = randf() * TAU
-		var radius: float = randf_range(6.0, 14.0)
-		var offset: Vector2 = Vector2(cos(angle), sin(angle)) * radius
+		var radius: float = randf_range(16.0, 28.0)
+		var jitter: Vector2 = Vector2(randf_range(-3.0, 3.0), randf_range(-3.0, 3.0))
+		var offset: Vector2 = Vector2(cos(angle), sin(angle)) * radius + jitter
 		pickup.start_pop(offset)

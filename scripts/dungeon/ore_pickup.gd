@@ -117,6 +117,13 @@ func _try_collect(player_pos: Vector2) -> void:
 		_bounce_away(player_pos)
 		return
 	Inventory.add_ore(ore_data, mineral, 1)
+	# Sprint 2: floating ore-name popup on the player.
+	var player: Node2D = _find_player()
+	if player and player.has_method("show_pickup_popup"):
+		var popup_text: String = ore_data.display_name
+		if mineral:
+			popup_text = "%s %s" % [mineral.display_name, ore_data.display_name]
+		player.call("show_pickup_popup", popup_text)
 	queue_free()
 
 

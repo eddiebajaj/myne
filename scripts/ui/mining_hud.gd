@@ -16,6 +16,7 @@ extends Control
 var bot_placer: BotPlacer = null
 var build_step: int = 0  # 0=closed, 1=pick bot, 2=pick ore
 var selected_bot: BotData = null
+var cancel_placement_btn: Button = null
 
 
 func _ready() -> void:
@@ -31,6 +32,48 @@ func _ready() -> void:
 
 func set_bot_placer(placer: BotPlacer) -> void:
 	bot_placer = placer
+	placer.placement_started.connect(_on_placement_started)
+	placer.bot_built.connect(func(_bd, _tier, _mineral): _hide_cancel_button())
+	placer.build_cancelled.connect(_hide_cancel_button)
+	_ensure_cancel_button()
+
+
+func _ensure_cancel_button() -> void:
+	## Sprint 2 bug 4: on mobile there is no right-click to cancel placement,
+	## so we surface a visible Cancel button while the bot_placer is active.
+	## The button lives on the HUD (not the touch overlay) so it also works
+	## on desktop if the player prefers clicking over right-clicking.
+	if cancel_placement_btn != null:
+		return
+	cancel_placement_btn = Button.new()
+	cancel_placement_btn.text = "Cancel Placement"
+	cancel_placement_btn.visible = false
+	cancel_placement_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	cancel_placement_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	# Anchor to bottom-center, above touch action buttons (which sit ~bottom-right).
+	cancel_placement_btn.anchor_left = 0.5
+	cancel_placement_btn.anchor_right = 0.5
+	cancel_placement_btn.anchor_top = 1.0
+	cancel_placement_btn.anchor_bottom = 1.0
+	cancel_placement_btn.offset_left = -90.0
+	cancel_placement_btn.offset_right = 90.0
+	cancel_placement_btn.offset_top = -80.0
+	cancel_placement_btn.offset_bottom = -40.0
+	cancel_placement_btn.pressed.connect(func():
+		if bot_placer:
+			bot_placer._cancel_placement()
+	)
+	add_child(cancel_placement_btn)
+
+
+func _on_placement_started(_bot_data: BotData) -> void:
+	if cancel_placement_btn:
+		cancel_placement_btn.visible = true
+
+
+func _hide_cancel_button() -> void:
+	if cancel_placement_btn:
+		cancel_placement_btn.visible = false
 
 
 func set_player(player: Player) -> void:

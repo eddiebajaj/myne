@@ -5,6 +5,7 @@ extends Node2D
 
 signal bot_built(bot_data: BotData, ore_tier: int, mineral: MineralData)
 signal build_cancelled
+signal placement_started(bot_data: BotData)
 
 var bot_defs: Array[BotData] = []
 var selected_bot: BotData = null
@@ -13,6 +14,8 @@ var selected_mineral_id: String = ""
 var placing: bool = false
 var ghost: ColorRect = null
 var emergency_battery_used_this_floor: bool = false
+var _last_touch_pos: Vector2 = Vector2.ZERO
+var _last_confirm_frame: int = -1
 
 
 func _ready() -> void:
@@ -26,13 +29,40 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if placing and event is InputEventMouseButton:
+	if not placing:
+		return
+	# Explicit touch branch (sprint 2 bug 4).  emulate_mouse_from_touch is on in
+	# project.godot so taps usually also fire an InputEventMouseButton, but we
+	# handle screen touch directly for belt-and-braces support and to capture
+	# the touch position in screen coordinates.
+	var current_frame: int = Engine.get_process_frames()
+	if event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		if st.pressed and current_frame != _last_confirm_frame:
+			_last_confirm_frame = current_frame
+			_last_touch_pos = st.position
+			_confirm_placement_at_screen_pos(st.position)
+			get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			if current_frame == _last_confirm_frame:
+				# Already handled by touch branch this frame (emulate_mouse_from_touch).
+				get_viewport().set_input_as_handled()
+				return
+			_last_confirm_frame = current_frame
 			_confirm_placement()
 			get_viewport().set_input_as_handled()
 		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			_cancel_placement()
 			get_viewport().set_input_as_handled()
+
+
+func _confirm_placement_at_screen_pos(screen_pos: Vector2) -> void:
+	## Converts a viewport-space touch position to world-space for placement.
+	var xform: Transform2D = get_canvas_transform()
+	var world: Vector2 = xform.affine_inverse() * screen_pos
+	_confirm_placement(world)
 
 
 func select_bot_and_ore(bot_data: BotData, ore_id: String, mineral_id: String) -> void:
@@ -46,9 +76,10 @@ func select_bot_and_ore(bot_data: BotData, ore_id: String, mineral_id: String) -
 	ghost.color = Color(bot_data.color, 0.5)
 	ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(ghost)
+	placement_started.emit(bot_data)
 
 
-func _confirm_placement() -> void:
+func _confirm_placement(world_pos_override: Vector2 = Vector2(INF, INF)) -> void:
 	if selected_bot == null:
 		return
 	# Check Emergency Battery artifact
@@ -81,7 +112,11 @@ func _confirm_placement() -> void:
 	if result.is_empty():
 		_cancel_placement()
 		return
-	var pos := get_global_mouse_position()
+	var pos: Vector2
+	if is_inf(world_pos_override.x):
+		pos = get_global_mouse_position()
+	else:
+		pos = world_pos_override
 	_spawn_bot(selected_bot, pos, result.ore_tier, result.mineral)
 	bot_built.emit(selected_bot, result.ore_tier, result.mineral)
 	_cleanup_ghost()
