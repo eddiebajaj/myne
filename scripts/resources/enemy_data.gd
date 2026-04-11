@@ -23,3 +23,8 @@ enum DamageType { PHYSICAL, VENOM }
 @export var projectile_speed: float = 200.0  # For RANGED archetype
 @export var explode_radius: float = 60.0     # For EXPLODER archetype
 @export var explode_damage: float = 15.0     # For EXPLODER archetype
+## Idle behavior dispatch for enemy_base.gd. One of:
+##   "wander_aggro"    — wanders spawn area, aggros when player enters aggro_range (default).
+##   "passive_wander"  — wanders, only aggros after being damaged (has_been_provoked).
+##   "always_aggro"    — no wandering, chases when player in aggro_range, idle otherwise.
+@export var behavior: String = "wander_aggro"

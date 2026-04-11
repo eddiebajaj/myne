@@ -18,6 +18,12 @@ var poison_timer: float = 0.0
 var poison_dps: float = 0.0
 var poison_ramp: float = 0.0
 
+# Wander / provocation state (sprint 2b)
+var wander_target: Vector2 = Vector2.ZERO
+var wander_idle_timer: float = 0.0
+var has_wander_target: bool = false
+var has_been_provoked: bool = false
+
 @onready var sprite: ColorRect = $Sprite
 @onready var health_bar: ProgressBar = $HealthBar
 
@@ -42,7 +48,14 @@ func setup(enemy_data: EnemyData) -> void:
 func _physics_process(delta: float) -> void:
 	attack_timer -= delta
 	_process_status_effects(delta)
-	_find_target()
+	# Behavior dispatch: passive_wander ignores aggro scanning unless provoked.
+	var should_scan: bool = true
+	if data and data.behavior == "passive_wander" and not has_been_provoked:
+		should_scan = false
+	if should_scan:
+		_find_target()
+	else:
+		target = null
 	if target and is_instance_valid(target):
 		var dist := global_position.distance_to(target.global_position)
 		# Leash check for fauna
@@ -57,7 +70,47 @@ func _physics_process(delta: float) -> void:
 			_move_toward_target(delta)
 	else:
 		target = null
+		_idle_behavior(delta)
+
+
+func _idle_behavior(delta: float) -> void:
+	## Dispatched when no target. Wander for fauna, stand still for mineral.
+	if data == null:
 		velocity = Vector2.ZERO
+		return
+	var effective_behavior: String = data.behavior
+	# Provoked passive_wander behaves like wander_aggro for the rest of its life.
+	if effective_behavior == "passive_wander" and has_been_provoked:
+		effective_behavior = "wander_aggro"
+	match effective_behavior:
+		"always_aggro":
+			velocity = Vector2.ZERO
+		"passive_wander", "wander_aggro":
+			_wander(delta)
+		_:
+			velocity = Vector2.ZERO
+
+
+func _wander(delta: float) -> void:
+	## Pick a random point within 150 px of spawn_position, walk at 50% speed,
+	## idle 0.8-2.0s on arrival, repeat.
+	if wander_idle_timer > 0.0:
+		wander_idle_timer -= delta
+		velocity = Vector2.ZERO
+		return
+	if not has_wander_target:
+		var offset: Vector2 = Vector2.from_angle(randf() * TAU) * randf_range(20.0, 150.0)
+		wander_target = spawn_position + offset
+		has_wander_target = true
+	var to_target: Vector2 = wander_target - global_position
+	if to_target.length() <= 10.0:
+		has_wander_target = false
+		wander_idle_timer = randf_range(0.8, 2.0)
+		velocity = Vector2.ZERO
+		return
+	var speed: float = data.move_speed * 0.5 * slow_mult
+	velocity = to_target.normalized() * speed
+	move_and_slide()
 
 
 func _find_target() -> void:
@@ -119,6 +172,8 @@ func _attack() -> void:
 
 
 func take_damage(amount: float, _damage_type: int = 0) -> void:
+	# Any damage flips passive_wander enemies into aggro for the rest of their life.
+	has_been_provoked = true
 	health -= amount
 	if health_bar:
 		health_bar.value = health

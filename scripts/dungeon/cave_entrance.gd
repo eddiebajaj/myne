@@ -8,14 +8,68 @@ extends Area2D
 
 var player_in_range: bool = false
 var activated: bool = false
+var cave_roll: String = "standard"
+var glow_rect: ColorRect = null
+var x_marker: Label = null
+var empty_border: ColorRect = null
 
 
 func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 	sprite.color = Color(0.6, 0.1, 0.1)
-	label.text = "Cave [E] (Danger!)"
+	label.text = "Cave [E]"
 	label.visible = false
+	_roll_cave_contents()
+	_build_visual_states()
+
+
+func _roll_cave_contents() -> void:
+	## Sprint 2b locked table: 40 standard / 15 treasure / 20 ambush / 10 big_ambush / 15 empty.
+	var roll: float = randf()
+	if roll < 0.40:
+		cave_roll = "standard"
+	elif roll < 0.55:
+		cave_roll = "treasure"
+	elif roll < 0.75:
+		cave_roll = "ambush"
+	elif roll < 0.85:
+		cave_roll = "big_ambush"
+	else:
+		cave_roll = "empty"
+
+
+func _build_visual_states() -> void:
+	## Pulsing glow for unexplored, hidden X marker for activated, dark border for empty.
+	glow_rect = ColorRect.new()
+	glow_rect.name = "Glow"
+	glow_rect.size = Vector2(64, 64)
+	glow_rect.position = Vector2(-32, -32)
+	glow_rect.color = Color(1.0, 0.4, 0.2, 0.35)
+	glow_rect.show_behind_parent = true
+	glow_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(glow_rect)
+	var tween: Tween = create_tween().set_loops()
+	tween.tween_property(glow_rect, "color:a", 0.5, 0.6)
+	tween.tween_property(glow_rect, "color:a", 0.2, 0.6)
+
+	x_marker = Label.new()
+	x_marker.name = "XMarker"
+	x_marker.text = "X"
+	x_marker.position = Vector2(-6, -12)
+	x_marker.add_theme_color_override("font_color", Color(0.8, 0.3, 0.3))
+	x_marker.visible = false
+	add_child(x_marker)
+
+	if cave_roll == "empty":
+		empty_border = ColorRect.new()
+		empty_border.name = "EmptyBorder"
+		empty_border.size = Vector2(52, 52)
+		empty_border.position = Vector2(-26, -26)
+		empty_border.color = Color(0, 0, 0, 0.25)
+		empty_border.show_behind_parent = true
+		empty_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(empty_border)
 
 
 func _process(_delta: float) -> void:
@@ -27,37 +81,104 @@ func _activate() -> void:
 	activated = true
 	label.text = "Cave (cleared)"
 	sprite.color = Color(0.3, 0.1, 0.1, 0.5)
-	_spawn_fauna()
-	_spawn_loot()
-	# Rare ore around cave
-	_spawn_cave_ore()
+	if glow_rect:
+		glow_rect.visible = false
+	if x_marker:
+		x_marker.visible = true
+	var floor_num: int = GameManager.current_floor
+	match cave_roll:
+		"standard":
+			_spawn_loot_n(1)
+			_spawn_cave_ore_fixed(2, false)
+		"treasure":
+			_spawn_loot_n(2)
+			_spawn_cave_ore_fixed(4, true)
+		"ambush":
+			var comp: Array[String] = _ambush_composition(floor_num)
+			_spawn_ambush(comp)
+			_spawn_loot_n(2)
+			_spawn_cave_ore_fixed(3, false)
+		"big_ambush":
+			var comp2: Array[String] = _big_ambush_composition(floor_num)
+			_spawn_ambush(comp2)
+			_spawn_loot_n(3)
+			_spawn_cave_ore_fixed(3, true)
+		"empty":
+			_spawn_cave_ore_fixed(1, false)
+			_spawn_dust_particle()
 
 
-func _spawn_fauna() -> void:
-	## Spawn territorial fauna enemies.
+func _ambush_composition(floor_num: int) -> Array[String]:
+	if floor_num <= 2:
+		return ["cave_beetle", "cave_beetle"]
+	return ["cave_beetle", "tunnel_rat"]
+
+
+func _big_ambush_composition(floor_num: int) -> Array[String]:
+	if floor_num <= 3:
+		return ["cave_beetle", "crystal_mite"]
+	return ["cave_beetle", "crystal_mite", "ore_shard"]
+
+
+func _spawn_ambush(composition: Array[String]) -> void:
 	var floor_gen := _find_floor_generator()
 	if floor_gen == null:
 		return
-	var count := randi_range(3, 5)
+	for id in composition:
+		var offset: Vector2 = Vector2.from_angle(randf() * TAU) * randf_range(60.0, 100.0)
+		var pos: Vector2 = global_position + offset
+		var enemy: EnemyBase = floor_gen.spawn_enemy_by_id(pos, id)
+		if enemy == null or enemy.data == null:
+			continue
+		# Leash cave ambush enemies to the cave so they don't overrun the whole floor.
+		enemy.spawn_position = global_position
+		if enemy.data.faction == EnemyData.Faction.MINERAL_ENTITY:
+			# Override: mineral entities normally have no leash; clamp per sprint 2b spec.
+			enemy.data.leash_range = 300.0
+		else:
+			enemy.data.leash_range = 200.0
+
+
+func _spawn_loot_n(count: int) -> void:
+	var tier: int = GameManager.get_current_tier()
 	for i in range(count):
-		var offset := Vector2.from_angle(randf() * TAU) * randf_range(40, 80)
-		floor_gen.spawn_enemy_at(global_position + offset)
+		var loot: Dictionary = _generate_loot(tier)
+		if loot.is_empty():
+			continue
+		_create_loot_pickup(loot)
 
 
-func _spawn_cave_ore() -> void:
+func _spawn_cave_ore_fixed(count: int, force_first_mineral: bool) -> void:
 	var floor_gen := _find_floor_generator()
 	if floor_gen == null:
 		return
-	var rare_ores = floor_gen.get_rare_ores()
-	var all_minerals := MineralData.get_all_minerals()
-	for i in range(randi_range(3, 6)):
+	var rare_ores: Array[OreData] = floor_gen.get_rare_ores()
+	if rare_ores.is_empty():
+		return
+	var all_minerals: Array[MineralData] = MineralData.get_all_minerals()
+	for i in range(count):
 		var ore_data: OreData = rare_ores[randi() % rare_ores.size()]
-		# Cave ore has higher mineral chance
 		var mineral: MineralData = null
-		if randf() < 0.5:
+		if force_first_mineral and i == 0:
 			mineral = all_minerals[randi() % all_minerals.size()]
-		var offset := Vector2.from_angle(randf() * TAU) * randf_range(60, 120)
+		elif randf() < 0.5:
+			mineral = all_minerals[randi() % all_minerals.size()]
+		var offset: Vector2 = Vector2.from_angle(randf() * TAU) * randf_range(60.0, 120.0)
 		floor_gen.spawn_ore_node_at(global_position + offset, ore_data, mineral)
+
+
+func _spawn_dust_particle() -> void:
+	## Single ColorRect that fades out over 2s — "already looted ages ago" feedback.
+	var dust := ColorRect.new()
+	dust.name = "Dust"
+	dust.size = Vector2(40, 40)
+	dust.position = Vector2(-20, -20)
+	dust.color = Color(0.7, 0.65, 0.55, 0.6)
+	dust.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(dust)
+	var tween: Tween = create_tween()
+	tween.tween_property(dust, "color:a", 0.0, 2.0)
+	tween.tween_callback(dust.queue_free)
 
 
 func _spawn_loot() -> void:
