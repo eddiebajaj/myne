@@ -146,7 +146,7 @@ func _find_button_at(pos: Vector2) -> Panel:
 	# viewport is scaled; we need to convert to the game's logical coordinates.
 	# get_final_transform() maps from viewport pixels → canvas coordinates.
 	var xform := get_viewport().get_final_transform()
-	var logical_pos := xform * pos
+	var logical_pos := xform.affine_inverse() * pos
 	for btn in _get_all_buttons():
 		var rect := Rect2(btn.position, btn.size)
 		if rect.has_point(logical_pos):
@@ -222,3 +222,18 @@ func _input(event: InputEvent) -> void:
 					_release_action(action_name, panel)
 					_active_touches.erase(-1)
 					get_viewport().set_input_as_handled()
+
+	elif event is InputEventMouseMotion:
+		# Handle drag-off when touch is emulated as mouse (web).
+		if -1 in _active_touches:
+			var mm := event as InputEventMouseMotion
+			var old_panel: Panel = _active_touches[-1]
+			var new_panel := _find_button_at(mm.position)
+			if new_panel != old_panel:
+				var action_name: String = old_panel.get_meta("action_name")
+				_release_action(action_name, old_panel)
+				_active_touches.erase(-1)
+				if new_panel:
+					var new_action: String = new_panel.get_meta("action_name")
+					_press_action(new_action, new_panel)
+					_active_touches[-1] = new_panel
