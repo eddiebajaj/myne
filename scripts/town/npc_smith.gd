@@ -34,6 +34,9 @@ func _ready() -> void:
 	label.text = "Smith [E]"
 	label.visible = false
 	menu_panel.visible = false
+	# Menu must keep processing while the game is paused so buttons respond.
+	var menu_layer: CanvasLayer = $CanvasLayer
+	menu_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	close_button.pressed.connect(_close_menu)
 
 
@@ -45,6 +48,7 @@ func _process(_delta: float) -> void:
 func _open_menu() -> void:
 	menu_open = true
 	menu_panel.visible = true
+	get_tree().paused = true
 	_refresh_ui()
 
 
@@ -52,6 +56,7 @@ func _close_menu() -> void:
 	menu_open = false
 	menu_panel.visible = false
 	result_label.text = ""
+	get_tree().paused = false
 
 
 func _refresh_ui() -> void:

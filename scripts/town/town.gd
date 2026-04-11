@@ -51,6 +51,7 @@ func _build_town_hud() -> void:
 	hbox.name = "PersistentHUD"
 	hbox.position = Vector2(1280.0 - 280.0, 16.0)
 	hbox.size = Vector2(264.0, 32.0)
+	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_root.add_child(hbox)
 	town_battery_label = Label.new()
 	town_battery_label.text = "Bat x 0"

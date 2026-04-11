@@ -10,6 +10,8 @@ const BUTTON_ALPHA := 0.45
 const VIEWPORT_W := 1280
 const VIEWPORT_H := 720
 
+var _backpack_toggle_frame: int = -1
+
 
 func _ready() -> void:
 	layer = 100
@@ -79,25 +81,35 @@ func _build_backpack_button(parent: Control) -> void:
 
 
 func _on_backpack_btn_input(event: InputEvent, panel: Panel) -> void:
+	# Godot fires BOTH InputEventScreenTouch and (via emulate_mouse_from_touch)
+	# InputEventMouseButton for a single physical tap.  A debounce by frame
+	# prevents toggle() from being called twice per tap (which would be a no-op).
 	var is_press: bool = false
+	var is_release: bool = false
 	if event is InputEventScreenTouch:
 		var t: InputEventScreenTouch = event
 		is_press = t.pressed
+		is_release = not t.pressed
 		panel.accept_event()
 	elif event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event
 		if mb.button_index != MOUSE_BUTTON_LEFT:
 			return
 		is_press = mb.pressed
+		is_release = not mb.pressed
 		panel.accept_event()
 	else:
 		return
 	if is_press:
+		var current_frame: int = Engine.get_process_frames()
+		if current_frame == _backpack_toggle_frame:
+			return
+		_backpack_toggle_frame = current_frame
 		panel.modulate = Color(1.2, 1.2, 1.4, 1.0)
 		var bp: Node = get_node_or_null("/root/BackpackPanel")
 		if bp and bp.has_method("toggle"):
 			bp.call("toggle")
-	else:
+	elif is_release:
 		panel.modulate = Color(1, 1, 1, 1)
 
 

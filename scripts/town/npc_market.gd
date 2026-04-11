@@ -33,6 +33,8 @@ func _ready() -> void:
 	label.text = "Market [E]"
 	label.visible = false
 	menu_panel.visible = false
+	var menu_layer: CanvasLayer = $CanvasLayer
+	menu_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	sell_button.pressed.connect(_on_sell)
 	buy_battery_button.pressed.connect(_on_buy_battery)
 	close_button.pressed.connect(_close_menu)
@@ -52,6 +54,7 @@ func _process(_delta: float) -> void:
 func _open_menu() -> void:
 	menu_open = true
 	menu_panel.visible = true
+	get_tree().paused = true
 	_refresh_ui()
 	menu_opened.emit()
 
@@ -60,6 +63,7 @@ func _close_menu() -> void:
 	menu_open = false
 	menu_panel.visible = false
 	result_label.text = ""
+	get_tree().paused = false
 	menu_closed.emit()
 
 

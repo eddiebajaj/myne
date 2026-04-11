@@ -27,6 +27,7 @@ var is_invulnerable: bool = false
 @onready var body_sprite: ColorRect = $BodySprite
 @onready var pickaxe_sprite: ColorRect = $PickaxeSprite
 @onready var invuln_timer: Timer = $InvulnTimer
+var facing_nose: ColorRect = null
 
 
 func _ready() -> void:
@@ -39,19 +40,31 @@ func _ready() -> void:
 	invuln_timer.timeout.connect(func(): is_invulnerable = false; modulate.a = 1.0)
 	health = max_health
 	armor = max_armor
+	# Small facing indicator ("nose") so the player can read which way they're aimed.
+	facing_nose = ColorRect.new()
+	facing_nose.color = Color(1.0, 0.95, 0.4)
+	facing_nose.size = Vector2(10, 10)
+	facing_nose.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(facing_nose)
+	_update_facing_visuals()
 	health_changed.emit(health, max_health, armor, max_armor)
 
 
 func _physics_process(_delta: float) -> void:
-	var input_dir := Vector2(
+	var input_dir: Vector2 = Vector2(
 		Input.get_axis("move_left", "move_right"),
 		Input.get_axis("move_up", "move_down")
 	)
 	if input_dir.length() > 0:
-		facing_dir = input_dir.normalized()
+		# Snap facing to 4 cardinals for crisp readability.
+		if absf(input_dir.x) >= absf(input_dir.y):
+			facing_dir = Vector2(signf(input_dir.x), 0.0)
+		else:
+			facing_dir = Vector2(0.0, signf(input_dir.y))
 	velocity = input_dir.normalized() * MOVE_SPEED
 	move_and_slide()
 	_update_pickaxe_position()
+	_update_facing_visuals()
 
 	if Input.is_action_just_pressed("mine") and can_swing:
 		swing_pickaxe()
@@ -60,13 +73,17 @@ func _physics_process(_delta: float) -> void:
 func swing_pickaxe() -> void:
 	can_swing = false
 	swing_timer.start()
-	# Animate
-	var tween := create_tween()
+	# The ColorRect's rect is offset to the right of its node origin (see player.tscn),
+	# so rotating the node around its origin sweeps an arc on whichever side the
+	# player is facing.  Set the base rotation to face_dir first, then tween +90deg.
+	var base_rot: float = facing_dir.angle()
+	pickaxe_sprite.rotation = base_rot - deg_to_rad(45)
 	pickaxe_sprite.visible = true
-	tween.tween_property(pickaxe_sprite, "rotation", pickaxe_sprite.rotation + deg_to_rad(90), 0.15)
+	var tween: Tween = create_tween()
+	tween.tween_property(pickaxe_sprite, "rotation", base_rot + deg_to_rad(45), 0.15)
 	tween.tween_callback(func():
 		pickaxe_sprite.visible = false
-		pickaxe_sprite.rotation = 0
+		pickaxe_sprite.rotation = 0.0
 	)
 	# Hit everything in pickaxe area
 	for body in pickaxe_area.get_overlapping_bodies():
@@ -103,6 +120,14 @@ func _die() -> void:
 func _update_pickaxe_position() -> void:
 	pickaxe_area.position = facing_dir * PICKAXE_RANGE
 	pickaxe_area.rotation = facing_dir.angle()
+
+
+func _update_facing_visuals() -> void:
+	if facing_nose == null:
+		return
+	# Position the nose just outside the body (14px half-extent) in facing_dir.
+	var nose_center: Vector2 = facing_dir * 18.0
+	facing_nose.position = nose_center - facing_nose.size * 0.5
 
 
 func _apply_upgrades() -> void:
