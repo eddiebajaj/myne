@@ -286,6 +286,7 @@ func _collect_loot(loot: Dictionary) -> void:
 				var p: Player = player_nodes[0]
 				p.max_armor = maxf(p.max_armor, armor_val)
 				p.armor = p.max_armor
+				GameManager.set_run_max_armor(p.max_armor)
 				p.health_changed.emit(p.health, p.max_health, p.armor, p.max_armor)
 		"blueprint":
 			if not Inventory.blueprints.has(loot.id):

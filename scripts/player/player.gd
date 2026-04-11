@@ -40,8 +40,21 @@ func _ready() -> void:
 	invuln_timer.wait_time = 0.5
 	invuln_timer.one_shot = true
 	invuln_timer.timeout.connect(func(): is_invulnerable = false; modulate.a = 1.0)
-	health = max_health
-	armor = max_armor
+	# Pull vitals from GameManager so HP/armor persist across scene reloads
+	# (e.g. descending stairs rebuilds mining_floor.tscn, destroying Player).
+	# Fall back to local defaults if autoload wasn't initialized.
+	if GameManager.run_max_health > 0.0:
+		max_health = GameManager.run_max_health
+		health = GameManager.run_health
+		max_armor = GameManager.run_max_armor
+		armor = GameManager.run_armor
+	else:
+		health = max_health
+		armor = max_armor
+		GameManager.run_max_health = max_health
+		GameManager.run_health = health
+		GameManager.run_max_armor = max_armor
+		GameManager.run_armor = armor
 	# Small facing indicator ("nose") so the player can read which way they're aimed.
 	facing_nose = ColorRect.new()
 	facing_nose.color = Color(1.0, 0.95, 0.4)
@@ -118,9 +131,18 @@ func take_damage(amount: float, damage_type: int = DamageType.PHYSICAL) -> void:
 	is_invulnerable = true
 	invuln_timer.start()
 	modulate.a = 0.5
+	_sync_vitals_to_gm()
 	health_changed.emit(health, max_health, armor, max_armor)
 	if health <= 0:
 		_die()
+
+
+func _sync_vitals_to_gm() -> void:
+	## Write current HP/armor back to the autoload so they survive scene reloads.
+	GameManager.run_health = health
+	GameManager.run_max_health = max_health
+	GameManager.run_armor = armor
+	GameManager.run_max_armor = max_armor
 
 
 func _die() -> void:

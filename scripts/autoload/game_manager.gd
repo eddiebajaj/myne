@@ -16,6 +16,15 @@ var run_start_floor: int = 1
 var gold: int = 0
 var total_runs: int = 0
 
+# --- Run-persistent player vitals ---
+# These survive scene reloads (e.g. descending stairs rebuilds mining_floor.tscn).
+# Player._ready() reads from these; take_damage() writes back.
+const DEFAULT_MAX_HEALTH := 50.0
+var run_health: float = DEFAULT_MAX_HEALTH
+var run_max_health: float = DEFAULT_MAX_HEALTH
+var run_armor: float = 0.0
+var run_max_armor: float = 0.0
+
 const CHECKPOINT_INTERVAL := 5
 const MAX_FLOOR := 20
 
@@ -55,6 +64,7 @@ func start_run(from_checkpoint: int = 0) -> void:
 	run_start_floor = from_checkpoint if from_checkpoint > 0 else 1
 	current_floor = run_start_floor
 	Inventory.begin_run()
+	_reset_run_vitals()
 	get_tree().change_scene_to_file("res://scenes/dungeon/mining_floor.tscn")
 	current_state = GameState.MINING
 	state_changed.emit(current_state)
@@ -125,3 +135,20 @@ func get_cave_chance() -> float:
 	if current_floor < 2:
 		return 0.0
 	return clampf(0.25 + (current_floor - 2) * 0.03, 0.0, 0.6)
+
+
+# === Run vitals ===
+
+func _reset_run_vitals() -> void:
+	## Called at the start of every run. Pulls max_armor from the Smith upgrade.
+	run_max_health = DEFAULT_MAX_HEALTH
+	run_health = run_max_health
+	var upgraded_armor: float = float(Inventory.upgrade_levels.get("armor_value", 0.0))
+	run_max_armor = upgraded_armor
+	run_armor = run_max_armor
+
+
+func set_run_max_armor(value: float) -> void:
+	## Used by cave equipment loot that bumps the armor cap mid-run.
+	run_max_armor = maxf(run_max_armor, value)
+	run_armor = run_max_armor
