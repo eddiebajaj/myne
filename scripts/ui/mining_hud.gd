@@ -95,6 +95,12 @@ func set_player(player: Player) -> void:
 
 
 func _on_touch_b() -> void:
+	# Close backpack if open — B always dismisses backpack first
+	var bp = get_node_or_null("/root/BackpackPanel")
+	if bp and bp._is_open:
+		bp.close()
+		_touch_b_handled_frame = Engine.get_process_frames()
+		return
 	if bot_placer and bot_placer.placing:
 		return
 	_touch_b_handled_frame = Engine.get_process_frames()
@@ -117,9 +123,12 @@ func _process(_delta: float) -> void:
 	# --- B button: build menu toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
 		# Skip if the touch signal already handled this press on the same frame.
-		# Without this guard, the signal opens the menu during input processing,
-		# then _process sees is_action_just_pressed and immediately closes it.
 		if _touch_b_handled_frame == Engine.get_process_frames():
+			return
+		# Close backpack if open — B always dismisses backpack first
+		var bp_b = get_node_or_null("/root/BackpackPanel")
+		if bp_b and bp_b._is_open:
+			bp_b.close()
 			return
 		# Don't toggle menu while bot_placer is in placement mode — it handles its own cancel
 		if bot_placer and bot_placer.placing:
@@ -141,26 +150,18 @@ func _process(_delta: float) -> void:
 
 
 func _toggle_backpack_direct() -> void:
-	## Directly manipulate BackpackPanel state, bypassing its toggle/open/close
-	## guards which cause double-fire and frame-guard issues from cross-autoload calls.
+	## Toggle BackpackPanel via its own open/close methods.
+	## The @onready null issue is fixed — BackpackPanel resolves nodes in _ready
+	## via get_node_or_null, so open()/close()/_refresh() all work correctly.
 	var bp = get_node_or_null("/root/BackpackPanel")
 	if bp == null:
 		return
-	var root = bp.get_node_or_null("Root")
 	if bp._is_open:
-		bp._is_open = false
-		bp._close_inspect_popup()
-		if root:
-			root.visible = false
-		get_tree().paused = false
+		bp.close()
 	else:
-		bp._is_open = true
-		bp.visible = true  # Force CanvasLayer itself visible
-		bp.layer = 99      # Force above everything except TouchControls (100)
-		if root:
-			root.visible = true
-		get_tree().paused = true
-		bp._refresh()
+		bp.visible = true   # Force CanvasLayer itself visible
+		bp.layer = 99       # Force above everything except TouchControls (100)
+		bp.open()
 
 
 func _open_build_step1() -> void:
@@ -168,12 +169,8 @@ func _open_build_step1() -> void:
 	# Close backpack first if it's open
 	var bp = get_node_or_null("/root/BackpackPanel")
 	if bp and bp._is_open:
-		bp._is_open = false
-		bp._close_inspect_popup()
-		var root = bp.get_node_or_null("Root")
-		if root:
-			root.visible = false
-		# Don't unpause here — build menu will keep it paused
+		bp.close()
+		# close() unpauses, but build menu will re-pause below
 	build_step = 1
 	selected_bot = null
 	build_panel.visible = true

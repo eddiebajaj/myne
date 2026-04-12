@@ -19,25 +19,38 @@ var _inspect_popup: PanelContainer = null
 var _inspect_dim: ColorRect = null
 var _inspect_ore_id: String = ""
 var _inspect_mineral_id: String = ""
-@onready var root_control: Control = $Root
-@onready var panel: PanelContainer = $Root/Panel
-@onready var title_label: Label = $Root/Panel/VBox/HeaderRow/TitleLabel
-@onready var capacity_label: Label = $Root/Panel/VBox/HeaderRow/CapacityLabel
-@onready var grid_container: GridContainer = $Root/Panel/VBox/Body/GridWrap/Grid
-@onready var gold_label: Label = $Root/Panel/VBox/Body/SidePanel/GoldLabel
-@onready var battery_label: Label = $Root/Panel/VBox/Body/SidePanel/BatteryLabel
-@onready var followers_label: Label = $Root/Panel/VBox/Body/SidePanel/FollowersHeader
-@onready var followers_list: VBoxContainer = $Root/Panel/VBox/Body/SidePanel/FollowersList
-@onready var close_button: Button = $Root/Panel/VBox/CloseButton
+var root_control: Control
+var panel: PanelContainer
+var title_label: Label
+var capacity_label: Label
+var grid_container: GridContainer
+var gold_label: Label
+var battery_label: Label
+var followers_label: Label
+var followers_list: VBoxContainer
+var close_button: Button
 
 
 func _ready() -> void:
 	layer = 50
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	root_control.visible = false
-	close_button.pressed.connect(close)
+	root_control = get_node_or_null("Root")
+	panel = get_node_or_null("Root/Panel")
+	title_label = get_node_or_null("Root/Panel/VBox/HeaderRow/TitleLabel")
+	capacity_label = get_node_or_null("Root/Panel/VBox/HeaderRow/CapacityLabel")
+	grid_container = get_node_or_null("Root/Panel/VBox/Body/GridWrap/Grid")
+	gold_label = get_node_or_null("Root/Panel/VBox/Body/SidePanel/GoldLabel")
+	battery_label = get_node_or_null("Root/Panel/VBox/Body/SidePanel/BatteryLabel")
+	followers_label = get_node_or_null("Root/Panel/VBox/Body/SidePanel/FollowersHeader")
+	followers_list = get_node_or_null("Root/Panel/VBox/Body/SidePanel/FollowersList")
+	close_button = get_node_or_null("Root/Panel/VBox/CloseButton")
+	if root_control:
+		root_control.visible = false
+	if close_button:
+		close_button.pressed.connect(close)
 	_cell_size = CELL_SIZE_MOBILE if _is_touch_device() else CELL_SIZE_DESKTOP
-	grid_container.columns = GRID_COLS
+	if grid_container:
+		grid_container.columns = GRID_COLS
 	Inventory.inventory_changed.connect(_refresh)
 
 
