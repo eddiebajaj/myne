@@ -323,6 +323,7 @@ func _press_action(action_name: String, panel: Panel) -> void:
 	Input.action_press(action_name)
 	# Emit signal for reliable detection — consumers connect to these
 	if action_name == "action_a":
+		print("[TOUCH] action_a_pressed signal emitting, listeners=%d" % action_a_pressed.get_connections().size())
 		action_a_pressed.emit()
 	elif action_name == "action_b":
 		action_b_pressed.emit()

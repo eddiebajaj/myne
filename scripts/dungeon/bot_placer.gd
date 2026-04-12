@@ -35,6 +35,8 @@ func _ready() -> void:
 
 
 func _on_touch_a() -> void:
+	if _player:
+		_player.show_pickup_popup("[A] placing=%s bot=%s" % [placing, selected_bot != null])
 	if not placing or _player == null:
 		return
 	var target_pos: Vector2 = _player.global_position + _player.facing_dir * GHOST_OFFSET
@@ -81,6 +83,9 @@ func select_bot_and_ore(bot_data: BotData, ore_id: String, mineral_id: String) -
 
 
 func _confirm_placement(world_pos: Vector2) -> void:
+	if _player:
+		var can_build = Inventory.can_build_bot(selected_bot, selected_ore_id, selected_mineral_id) if selected_bot else false
+		_player.show_pickup_popup("CONFIRM bot=%s can_build=%s bat=%d" % [selected_bot != null, can_build, Inventory.batteries])
 	if selected_bot == null:
 		return
 	# Check Emergency Battery artifact
