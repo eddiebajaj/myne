@@ -266,7 +266,14 @@ func _press_action(action_name: String, panel: Panel) -> void:
 		return
 	_action_press_frame[action_name] = frame
 	panel.modulate = Color(1.2, 1.2, 1.4, 1.0)
-	Input.action_press(action_name)
+	# Inject a real InputEventAction so is_action_just_pressed and
+	# _unhandled_input work correctly (unlike Input.action_press which
+	# only sets internal state).
+	var ev := InputEventAction.new()
+	ev.action = action_name
+	ev.pressed = true
+	ev.strength = 1.0
+	Input.parse_input_event(ev)
 	# Emit signal for reliable detection — consumers connect to these
 	if action_name == "action_a":
 		action_a_pressed.emit()
@@ -278,4 +285,7 @@ func _press_action(action_name: String, panel: Panel) -> void:
 
 func _release_action(action_name: String, panel: Panel) -> void:
 	panel.modulate = Color(1, 1, 1, 1)
-	Input.action_release(action_name)
+	var ev := InputEventAction.new()
+	ev.action = action_name
+	ev.pressed = false
+	Input.parse_input_event(ev)

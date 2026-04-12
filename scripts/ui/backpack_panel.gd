@@ -52,10 +52,13 @@ func _is_touch_device() -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	# Desktop Tab key toggle (toggle_backpack action). Touch Y is handled by
 	# mining_hud via the TouchControls signal — no autoload timing issues.
+	# NOTE: action_y is NOT checked here. parse_input_event injects a real
+	# InputEventAction that reaches _unhandled_input, so if we also handled
+	# action_y here it would double-toggle alongside mining_hud's signal handler.
 	if event.is_action_pressed("toggle_backpack"):
 		toggle()
 		get_viewport().set_input_as_handled()
-	elif _is_open and (event.is_action_pressed("ui_cancel") or event.is_action_pressed("action_b")):
+	elif _is_open and event.is_action_pressed("ui_cancel"):
 		close()
 		get_viewport().set_input_as_handled()
 
