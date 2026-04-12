@@ -81,7 +81,7 @@ func _physics_process(_delta: float) -> void:
 	_update_pickaxe_position()
 	_update_facing_visuals()
 
-	if Input.is_action_just_pressed("mine") and can_swing:
+	if Input.is_action_just_pressed("mine") and can_swing and not get_meta("bot_placing", false):
 		swing_pickaxe()
 
 

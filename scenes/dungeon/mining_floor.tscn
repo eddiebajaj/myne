@@ -149,13 +149,15 @@ visible = false
 [node name="BuildPanel" type="PanelContainer" parent="CanvasLayer/MiningHUD"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 4
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 10
-offset_top = -280
-offset_right = 500
-offset_bottom = -10
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -245
+offset_top = -160
+offset_right = 245
+offset_bottom = 160
 visible = false
 
 [node name="ScrollContainer" type="ScrollContainer" parent="CanvasLayer/MiningHUD/BuildPanel"]

@@ -2,10 +2,16 @@ class_name BotPlacer
 extends Node2D
 ## Two-step bot building: pick bot type → pick ore stack → place.
 ## Costs: X ore of single type + 1 battery.
+##
+## Placement mode: ghost bot locks in front of player (based on facing direction).
+## Player walks to desired position, then presses Mine/Space to confirm.
+## This avoids tap-to-place conflicts with mobile touch controls.
 
 signal bot_built(bot_data: BotData, ore_tier: int, mineral: MineralData)
 signal build_cancelled
 signal placement_started(bot_data: BotData)
+
+const GHOST_OFFSET := 50.0  # Distance in front of player for ghost preview
 
 var bot_defs: Array[BotData] = []
 var selected_bot: BotData = null
@@ -14,8 +20,7 @@ var selected_mineral_id: String = ""
 var placing: bool = false
 var ghost: ColorRect = null
 var emergency_battery_used_this_floor: bool = false
-var _last_touch_pos: Vector2 = Vector2.ZERO
-var _last_confirm_frame: int = -1
+var _player: Player = null
 
 
 func _ready() -> void:
@@ -24,45 +29,22 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if placing and ghost:
-		ghost.global_position = get_global_mouse_position() - ghost.size / 2
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if not placing:
+	if not placing or ghost == null:
 		return
-	# Explicit touch branch (sprint 2 bug 4).  emulate_mouse_from_touch is on in
-	# project.godot so taps usually also fire an InputEventMouseButton, but we
-	# handle screen touch directly for belt-and-braces support and to capture
-	# the touch position in screen coordinates.
-	var current_frame: int = Engine.get_process_frames()
-	if event is InputEventScreenTouch:
-		var st: InputEventScreenTouch = event
-		if st.pressed and current_frame != _last_confirm_frame:
-			_last_confirm_frame = current_frame
-			_last_touch_pos = st.position
-			_confirm_placement_at_screen_pos(st.position)
-			get_viewport().set_input_as_handled()
+	# Find the player if we don't have a reference yet
+	if _player == null:
+		_player = get_tree().get_first_node_in_group("player") as Player
+	if _player == null:
 		return
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-			if current_frame == _last_confirm_frame:
-				# Already handled by touch branch this frame (emulate_mouse_from_touch).
-				get_viewport().set_input_as_handled()
-				return
-			_last_confirm_frame = current_frame
-			_confirm_placement()
-			get_viewport().set_input_as_handled()
-		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			_cancel_placement()
-			get_viewport().set_input_as_handled()
-
-
-func _confirm_placement_at_screen_pos(screen_pos: Vector2) -> void:
-	## Converts a viewport-space touch position to world-space for placement.
-	var xform: Transform2D = get_canvas_transform()
-	var world: Vector2 = xform.affine_inverse() * screen_pos
-	_confirm_placement(world)
+	# Ghost follows in front of the player based on facing direction
+	var target_pos: Vector2 = _player.global_position + _player.facing_dir * GHOST_OFFSET
+	ghost.global_position = target_pos - ghost.size / 2
+	# Confirm placement with Mine/Space button
+	if Input.is_action_just_pressed("mine"):
+		_confirm_placement(target_pos)
+	# Cancel with build_menu toggle (B key / Bld button)
+	if Input.is_action_just_pressed("build_menu"):
+		_cancel_placement()
 
 
 func select_bot_and_ore(bot_data: BotData, ore_id: String, mineral_id: String) -> void:
@@ -71,6 +53,9 @@ func select_bot_and_ore(bot_data: BotData, ore_id: String, mineral_id: String) -
 	selected_ore_id = ore_id
 	selected_mineral_id = mineral_id
 	placing = true
+	_player = get_tree().get_first_node_in_group("player") as Player
+	if _player:
+		_player.set_meta("bot_placing", true)
 	ghost = ColorRect.new()
 	ghost.size = Vector2(24, 24)
 	ghost.color = Color(bot_data.color, 0.5)
@@ -79,7 +64,7 @@ func select_bot_and_ore(bot_data: BotData, ore_id: String, mineral_id: String) -
 	placement_started.emit(bot_data)
 
 
-func _confirm_placement(world_pos_override: Vector2 = Vector2(INF, INF)) -> void:
+func _confirm_placement(world_pos: Vector2) -> void:
 	if selected_bot == null:
 		return
 	# Check Emergency Battery artifact
@@ -112,12 +97,7 @@ func _confirm_placement(world_pos_override: Vector2 = Vector2(INF, INF)) -> void
 	if result.is_empty():
 		_cancel_placement()
 		return
-	var pos: Vector2
-	if is_inf(world_pos_override.x):
-		pos = get_global_mouse_position()
-	else:
-		pos = world_pos_override
-	_spawn_bot(selected_bot, pos, result.ore_tier, result.mineral)
+	_spawn_bot(selected_bot, world_pos, result.ore_tier, result.mineral)
 	bot_built.emit(selected_bot, result.ore_tier, result.mineral)
 	_cleanup_ghost()
 
@@ -135,6 +115,8 @@ func _cleanup_ghost() -> void:
 	selected_bot = null
 	selected_ore_id = ""
 	selected_mineral_id = ""
+	if _player:
+		_player.set_meta("bot_placing", false)
 
 
 func _spawn_bot(bot_data: BotData, pos: Vector2, tier: int, mineral_mod: MineralData) -> void:
