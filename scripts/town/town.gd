@@ -25,11 +25,17 @@ var mine_panel: PanelContainer = null
 var mine_panel_options: VBoxContainer = null
 var mine_panel_enter_button: Button = null
 var mine_panel_option_buttons: Array[Button] = []
+var _a_was_pressed: bool = false
+var _b_was_pressed: bool = false
 
 
 func _ready() -> void:
 	# Ensure game is not paused
 	get_tree().paused = false
+	# Allow _process to run while paused so B-button can close the mine panel.
+	# Player is explicitly set to pausable so it stops during menus.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	player.process_mode = Node.PROCESS_MODE_PAUSABLE
 	player.add_to_group("player")
 	player.position = Vector2(640, 500)
 	# Legacy HUD widgets are replaced by the mine entrance panel — hide and ignore them.
@@ -198,6 +204,11 @@ func _open_mine_panel() -> void:
 	mine_panel.visible = true
 	mine_panel_dim.visible = true
 	get_tree().paused = true
+	# Focus first option button so keyboard/gamepad can activate it
+	if mine_panel_option_buttons.size() > 0:
+		mine_panel_option_buttons[0].grab_focus()
+	elif mine_panel_enter_button:
+		mine_panel_enter_button.grab_focus()
 
 
 func _close_mine_panel() -> void:
@@ -260,8 +271,19 @@ func _process(_delta: float) -> void:
 	# Refresh stats periodically (after NPC interactions)
 	if Engine.get_physics_frames() % 30 == 0:
 		_refresh_stats()
+	# Manual press-transition tracking for synthetic touch actions
+	var a_pressed := Input.is_action_pressed("action_a")
+	var a_just = a_pressed and not _a_was_pressed
+	_a_was_pressed = a_pressed
+	var b_pressed := Input.is_action_pressed("action_b")
+	var b_just = b_pressed and not _b_was_pressed
+	_b_was_pressed = b_pressed
+	# B closes mine panel
+	if mine_panel_open and b_just:
+		_close_mine_panel()
+		return
 	# Mine entrance interaction — match NPC menu pattern.
-	if mine_entrance_in_range and not mine_panel_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
+	if mine_entrance_in_range and not mine_panel_open and (Input.is_action_just_pressed("interact") or a_just):
 		_open_mine_panel()
 
 

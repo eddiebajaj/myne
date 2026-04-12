@@ -8,6 +8,7 @@ extends Area2D
 
 var player_in_range: bool = false
 var activated: bool = false
+var _a_was_pressed: bool = false
 var cave_roll: String = "standard"
 var glow_rect: ColorRect = null
 var x_marker: Label = null
@@ -73,7 +74,10 @@ func _build_visual_states() -> void:
 
 
 func _process(_delta: float) -> void:
-	if player_in_range and not activated and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
+	var a_pressed := Input.is_action_pressed("action_a")
+	var a_just = a_pressed and not _a_was_pressed
+	_a_was_pressed = a_pressed
+	if player_in_range and not activated and (Input.is_action_just_pressed("interact") or a_just):
 		_activate()
 
 

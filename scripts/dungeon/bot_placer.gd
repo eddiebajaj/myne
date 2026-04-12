@@ -21,6 +21,11 @@ var placing: bool = false
 var ghost: ColorRect = null
 var emergency_battery_used_this_floor: bool = false
 var _player: Player = null
+# Manual press-state tracking — Input.is_action_just_pressed doesn't reliably
+# detect synthetic Input.action_press() calls from touch controls due to frame
+# timing.  Track transitions ourselves instead.
+var _a_was_pressed: bool = false
+var _b_was_pressed: bool = false
 
 
 func _ready() -> void:
@@ -30,6 +35,8 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	if not placing or ghost == null:
+		_a_was_pressed = Input.is_action_pressed("action_a")
+		_b_was_pressed = Input.is_action_pressed("action_b")
 		return
 	# Find the player if we don't have a reference yet
 	if _player == null:
@@ -39,12 +46,15 @@ func _process(_delta: float) -> void:
 	# Ghost follows in front of the player based on facing direction
 	var target_pos: Vector2 = _player.global_position + _player.facing_dir * GHOST_OFFSET
 	ghost.global_position = target_pos - ghost.size / 2
-	# Confirm placement with A button / Space
-	if Input.is_action_just_pressed("action_a"):
+	# Detect press transitions (released → pressed) for confirm/cancel
+	var a_pressed := Input.is_action_pressed("action_a")
+	var b_pressed := Input.is_action_pressed("action_b")
+	if a_pressed and not _a_was_pressed:
 		_confirm_placement(target_pos)
-	# Cancel with B button / Escape
-	if Input.is_action_just_pressed("action_b"):
+	if b_pressed and not _b_was_pressed:
 		_cancel_placement()
+	_a_was_pressed = a_pressed
+	_b_was_pressed = b_pressed
 
 
 func select_bot_and_ore(bot_data: BotData, ore_id: String, mineral_id: String) -> void:

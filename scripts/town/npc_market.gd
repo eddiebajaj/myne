@@ -9,6 +9,8 @@ const BATTERY_PRICE := 8  # Gold per battery
 
 var player_in_range: bool = false
 var menu_open: bool = false
+var _a_was_pressed: bool = false
+var _b_was_pressed: bool = false
 
 @onready var sprite: ColorRect = $Sprite
 @onready var label: Label = $Label
@@ -38,6 +40,8 @@ func _ready() -> void:
 	sell_button.pressed.connect(_on_sell)
 	buy_battery_button.pressed.connect(_on_buy_battery)
 	close_button.pressed.connect(_close_menu)
+	# Allow _process to run while paused so B-button can close the menu.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	# Replace single inventory_label with a breakdown container.
 	inventory_label.visible = false
 	_breakdown_container = VBoxContainer.new()
@@ -47,7 +51,16 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if player_in_range and not menu_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
+	var a_pressed := Input.is_action_pressed("action_a")
+	var a_just = a_pressed and not _a_was_pressed
+	_a_was_pressed = a_pressed
+	var b_pressed := Input.is_action_pressed("action_b")
+	var b_just = b_pressed and not _b_was_pressed
+	_b_was_pressed = b_pressed
+	if menu_open and b_just:
+		_close_menu()
+		return
+	if player_in_range and not menu_open and (Input.is_action_just_pressed("interact") or a_just):
 		_open_menu()
 
 
@@ -57,6 +70,8 @@ func _open_menu() -> void:
 	get_tree().paused = true
 	_refresh_ui()
 	menu_opened.emit()
+	# Focus first interactive button so keyboard/gamepad can activate it
+	sell_button.grab_focus()
 
 
 func _close_menu() -> void:

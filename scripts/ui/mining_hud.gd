@@ -17,6 +17,7 @@ var bot_placer: BotPlacer = null
 var build_step: int = 0  # 0=closed, 1=pick bot, 2=pick ore
 var selected_bot: BotData = null
 var cancel_placement_btn: Button = null
+var _b_was_pressed: bool = false
 
 
 func _ready() -> void:
@@ -89,7 +90,10 @@ func set_player(player: Player) -> void:
 
 
 func _process(_delta: float) -> void:
-	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
+	var b_pressed := Input.is_action_pressed("action_b")
+	var b_just = b_pressed and not _b_was_pressed
+	_b_was_pressed = b_pressed
+	if b_just or Input.is_action_just_pressed("build_menu"):
 		# Don't toggle menu while bot_placer is in placement mode — it handles its own cancel
 		if bot_placer and bot_placer.placing:
 			return
@@ -106,6 +110,7 @@ func _open_build_step1() -> void:
 	build_panel.visible = true
 	get_tree().paused = true
 	_rebuild_bot_list()
+	_focus_first_build_button()
 
 
 func _open_build_step2(bot: BotData) -> void:
@@ -113,6 +118,7 @@ func _open_build_step2(bot: BotData) -> void:
 	build_step = 2
 	selected_bot = bot
 	_rebuild_ore_list()
+	_focus_first_build_button()
 
 
 func _close_build_menu() -> void:
@@ -120,6 +126,13 @@ func _close_build_menu() -> void:
 	build_step = 0
 	selected_bot = null
 	get_tree().paused = false
+
+
+func _focus_first_build_button() -> void:
+	for child in build_list.get_children():
+		if child is Button:
+			child.grab_focus()
+			return
 
 
 func _rebuild_bot_list() -> void:

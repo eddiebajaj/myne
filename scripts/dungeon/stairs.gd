@@ -9,6 +9,7 @@ enum StairType { DOWN, UP }
 @onready var sprite: ColorRect = $Sprite
 @onready var label: Label = $Label
 var player_in_range: bool = false
+var _a_was_pressed: bool = false
 
 
 func _ready() -> void:
@@ -24,7 +25,10 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if player_in_range and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
+	var a_pressed := Input.is_action_pressed("action_a")
+	var a_just = a_pressed and not _a_was_pressed
+	_a_was_pressed = a_pressed
+	if player_in_range and (Input.is_action_just_pressed("interact") or a_just):
 		if stair_type == StairType.DOWN:
 			GameManager.go_deeper()
 			# Reload the floor scene to generate a new floor

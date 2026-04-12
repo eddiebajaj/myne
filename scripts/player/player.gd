@@ -23,6 +23,7 @@ var facing_dir: Vector2 = Vector2.DOWN
 var is_invulnerable: bool = false
 var _last_popup_time: float = -1.0
 var _popup_stagger_index: int = 0
+var _a_was_pressed: bool = false
 
 @onready var swing_timer: Timer = $SwingTimer
 @onready var pickaxe_area: Area2D = $PickaxeArea
@@ -85,8 +86,11 @@ func _physics_process(_delta: float) -> void:
 	_update_pickaxe_position()
 	_update_facing_visuals()
 
-	if (Input.is_action_just_pressed("action_a") or Input.is_action_just_pressed("mine")) and can_swing and not get_meta("bot_placing", false):
+	# Manual press-transition for action_a (synthetic Input.action_press from touch)
+	var a_pressed := Input.is_action_pressed("action_a") or Input.is_action_pressed("mine")
+	if a_pressed and not _a_was_pressed and can_swing and not get_meta("bot_placing", false):
 		swing_pickaxe()
+	_a_was_pressed = a_pressed
 
 
 func swing_pickaxe() -> void:

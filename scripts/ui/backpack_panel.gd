@@ -71,6 +71,7 @@ func open() -> void:
 	root_control.visible = true
 	get_tree().paused = true
 	_refresh()
+	close_button.grab_focus()
 
 
 func close() -> void:
