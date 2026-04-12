@@ -245,7 +245,7 @@ func build_bot(bot: BotData, ore_id: String, mineral_id: String) -> Dictionary:
 	if not use_battery():
 		return {}  # Shouldn't happen if can_build_bot passed
 	if bot.category == BotData.BotCategory.FOLLOWER:
-		follower_bots.append({"data": bot, "health": bot.health, "ore_tier": ore_tier, "mineral": mineral_mod})
+		follower_bots.append({"data": bot, "health": bot.get_scaled_health(ore_tier), "ore_tier": ore_tier, "mineral": mineral_mod})
 		bots_changed.emit()
 	return {"ore_tier": ore_tier, "mineral": mineral_mod}
 

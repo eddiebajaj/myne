@@ -4,8 +4,8 @@ extends Node2D
 ## Ore spawns are tier-gated by depth. ~25% of nodes get a mineral modifier.
 ## Rocks hide stairs down (1 rock), treasure (1-2 rocks), rest are empty.
 
-const FLOOR_WIDTH := 800.0
-const FLOOR_HEIGHT := 600.0
+const FLOOR_WIDTH := 1400.0
+const FLOOR_HEIGHT := 1000.0
 const WALL_THICKNESS := 32.0
 const MINERAL_CHANCE := 0.25  # 25% of nodes have a mineral
 
@@ -19,6 +19,7 @@ var rock_scene: PackedScene
 var floor_time: float = 0.0  # Track time on floor for rock portal trigger
 var _occupied_positions: Array[Dictionary] = []  # Each entry: {"pos": Vector2, "radius": float}
 var stairs_up_position: Vector2 = Vector2.ZERO  # Set by _spawn_stairs_up(); consumed by controller + wanderer spawner
+var _current_template: Dictionary = {}  # Active floor template (from FloorTemplates.TEMPLATES)
 
 @onready var walls: Node2D = $Walls
 @onready var ore_container: Node2D = $OreNodes
@@ -39,7 +40,9 @@ func _process(delta: float) -> void:
 func generate_floor() -> void:
 	floor_time = 0.0
 	_occupied_positions.clear()
+	_current_template = _pick_template()
 	_create_walls()
+	_create_interior_walls()
 	# Stairs-up first so it reserves its slot before anything else claims it.
 	_spawn_stairs_up()
 	_spawn_ore_nodes()
@@ -56,7 +59,8 @@ func generate_floor() -> void:
 
 func _spawn_ore_nodes() -> void:
 	var density := GameManager.get_ore_density()
-	var count := int(12 * density) + randi_range(-2, 3)
+	var count := int(22 * density) + randi_range(-3, 4)
+	var ore_zone = _current_template["zones"].get("ore") if not _current_template.is_empty() else null
 	for i in range(count):
 		var ore := pick_ore_for_depth()
 		if ore == null:
@@ -68,7 +72,7 @@ func _spawn_ore_nodes() -> void:
 			mineral_roll += 0.15
 		if randf() < mineral_roll:
 			mineral = all_minerals[randi() % all_minerals.size()]
-		var pos: Vector2 = _reserve_position(60.0, 40.0)
+		var pos: Vector2 = _reserve_position(60.0, 40.0, 20, ore_zone)
 		spawn_ore_node_at(pos, ore, mineral)
 
 
@@ -114,10 +118,12 @@ func get_rare_ores() -> Array[OreData]:
 # === Stairs ===
 
 func _spawn_stairs_up() -> void:
-	## Stairs up are always visible from the start. Randomized position (sprint 2c).
+	## Stairs up are always visible from the start. Position owned by template.
 	var up: Area2D = stairs_scene.instantiate()
 	up.stair_type = Stairs.StairType.UP
-	var pos: Vector2 = _reserve_position(80.0, 80.0)
+	var pos: Vector2 = _current_template["stairs_up"] if not _current_template.is_empty() else Vector2(100, 100)
+	# Reserve the template position so nothing else spawns on top.
+	_occupied_positions.append({"pos": pos, "radius": 80.0})
 	up.position = pos
 	stairs_up_position = pos
 	entities.add_child(up)
@@ -134,8 +140,8 @@ func spawn_stairs_down_at(pos: Vector2) -> void:
 # === Rocks (from 13_balance_t1.md section 5b) ===
 
 func _spawn_rocks() -> void:
-	## 8-12 rocks per floor. 1 hides stairs down, 1-2 hide treasure, rest are empty.
-	var total_rocks := randi_range(8, 12)
+	## 14-20 rocks per floor. 1 hides stairs down, 1-2 hide treasure, rest are empty.
+	var total_rocks := randi_range(14, 20)
 	var treasure_count := randi_range(1, 2)
 	# Assign rock types
 	var rock_types: Array[String] = []
@@ -146,9 +152,18 @@ func _spawn_rocks() -> void:
 		rock_types.append("empty")
 	# Shuffle
 	rock_types.shuffle()
+	# Zone lookups for biased spawning
+	var zones: Dictionary = _current_template["zones"] if not _current_template.is_empty() else {}
+	var stairs_down_zone = zones.get("stairs_down_rock")
+	var rock_zone = zones.get("rocks")
 	# Spawn rocks spread across the floor
 	for i in range(rock_types.size()):
-		var pos: Vector2 = _reserve_position(50.0, 38.0)
+		var zone = null
+		if rock_types[i] == "stairs":
+			zone = stairs_down_zone
+		elif rock_zone != null:
+			zone = rock_zone
+		var pos: Vector2 = _reserve_position(50.0, 38.0, 20, zone)
 		var rock: StaticBody2D = rock_scene.instantiate()
 		rock.global_position = pos
 		rock.rock_content = rock_types[i]
@@ -191,8 +206,9 @@ func spawn_rock_triggered_portal(pos: Vector2) -> void:
 # === Cave ===
 
 func _spawn_cave() -> void:
+	var cave_zone = _current_template["zones"].get("cave") if not _current_template.is_empty() else null
 	var cave: Area2D = cave_scene.instantiate()
-	cave.position = _reserve_position(100.0, 80.0)
+	cave.position = _reserve_position(100.0, 80.0, 20, cave_zone)
 	entities.add_child(cave)
 
 
@@ -352,6 +368,58 @@ func _random_enemy() -> EnemyData:
 	return e
 
 
+# === Template Selection ===
+
+func _pick_template() -> Dictionary:
+	if GameManager.current_floor == 1:
+		return FloorTemplates.TEMPLATES["open_arena"]
+	var eligible := []
+	var total := 0.0
+	for t in FloorTemplates.TEMPLATES.values():
+		if GameManager.current_floor >= t["min_floor"]:
+			eligible.append(t)
+			total += t["weight"]
+	var roll := randf() * total
+	var acc := 0.0
+	for t in eligible:
+		acc += t["weight"]
+		if roll <= acc:
+			return t
+	return eligible[-1]
+
+
+func _create_interior_walls() -> void:
+	## Add interior walls from the current template and reserve their footprints.
+	if _current_template.is_empty():
+		return
+	var template_walls: Array = _current_template["walls"]
+	for w in template_walls:
+		_add_wall(w["pos"], w["size"])
+		_reserve_wall(w["pos"], w["size"])
+
+
+func _reserve_wall(pos: Vector2, size: Vector2) -> void:
+	## Approximate a wall rectangle with a chain of circular occupied markers so
+	## rejection sampling avoids spawning entities on walls.
+	## Place markers every 48px along the long axis; radius = half short axis + 24.
+	var is_horizontal: bool = size.x >= size.y
+	var long_len: float = size.x if is_horizontal else size.y
+	var short_len: float = size.y if is_horizontal else size.x
+	var marker_radius: float = short_len / 2.0 + 24.0
+	var half_long: float = long_len / 2.0
+	var step: float = 48.0
+	var count: int = int(ceil(long_len / step)) + 1
+	for i in range(count):
+		var t: float = -half_long + i * step
+		t = clampf(t, -half_long, half_long)
+		var marker_pos: Vector2
+		if is_horizontal:
+			marker_pos = Vector2(pos.x + t, pos.y)
+		else:
+			marker_pos = Vector2(pos.x, pos.y + t)
+		_occupied_positions.append({"pos": marker_pos, "radius": marker_radius})
+
+
 # === Walls ===
 
 func _create_walls() -> void:
@@ -387,13 +455,19 @@ func _random_floor_position(margin: float) -> Vector2:
 	)
 
 
-func _reserve_position(margin: float, min_separation: float, max_attempts: int = 20) -> Vector2:
+func _reserve_position(margin: float, min_separation: float, max_attempts: int = 20, zone = null) -> Vector2:
 	## Rejection-sample a floor position that is at least min_separation + other.radius
 	## away from every previously-reserved entity. Returns the last candidate if all
 	## attempts fail (no infinite loop). Registers the chosen position in the occupied list.
+	## If zone (Rect2) is provided, tries in-zone first for half the attempts, then
+	## falls back to arena-wide.
+	var zone_attempts: int = max_attempts / 2 if zone is Rect2 else 0
 	var candidate: Vector2 = _random_floor_position(margin)
 	for attempt in range(max_attempts):
-		candidate = _random_floor_position(margin)
+		if attempt < zone_attempts and zone is Rect2:
+			candidate = _random_zone_position(zone, margin)
+		else:
+			candidate = _random_floor_position(margin)
 		var ok: bool = true
 		for entry in _occupied_positions:
 			var other_pos: Vector2 = entry["pos"]
@@ -405,6 +479,18 @@ func _reserve_position(margin: float, min_separation: float, max_attempts: int =
 			break
 	_occupied_positions.append({"pos": candidate, "radius": min_separation})
 	return candidate
+
+
+func _random_zone_position(zone: Rect2, margin: float) -> Vector2:
+	## Sample a random position within the given zone rect, clamped to arena bounds.
+	var min_x: float = maxf(zone.position.x, WALL_THICKNESS + margin)
+	var max_x: float = minf(zone.position.x + zone.size.x, FLOOR_WIDTH - WALL_THICKNESS - margin)
+	var min_y: float = maxf(zone.position.y, WALL_THICKNESS + margin)
+	var max_y: float = minf(zone.position.y + zone.size.y, FLOOR_HEIGHT - WALL_THICKNESS - margin)
+	return Vector2(
+		randf_range(min_x, max_x),
+		randf_range(min_y, max_y)
+	)
 
 
 # === Ore type definitions (8 ores, 4 tiers) ===

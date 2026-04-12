@@ -81,13 +81,12 @@ func set_player(player: Player) -> void:
 	_on_health_changed(player.health, player.max_health, player.armor, player.max_armor)
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("build_menu"):
+func _process(_delta: float) -> void:
+	if Input.is_action_just_pressed("build_menu"):
 		if build_panel.visible:
 			_close_build_menu()
 		else:
 			_open_build_step1()
-		get_viewport().set_input_as_handled()
 
 
 func _open_build_step1() -> void:

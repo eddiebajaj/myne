@@ -190,7 +190,7 @@ func _create_bot_defs() -> void:
 	bot_defs.append(_make_bot("turret", "Turret", "Static, shoots enemies", Color(0.9, 0.7, 0.2),
 		BotData.BotCategory.STATIC, BotData.BotRole.DEFENSE, 3, 30.0, 6.0, 150.0, 1.0, 0.0))
 	bot_defs.append(_make_bot("mining_rig", "Mining Rig", "Static, auto-mines ore", Color(0.9, 0.6, 0.1),
-		BotData.BotCategory.STATIC, BotData.BotRole.MINING, 4, 20.0, 0.0, 80.0, 0.0, 0.0))
+		BotData.BotCategory.STATIC, BotData.BotRole.MINING, 4, 20.0, 0.0, 80.0, 1.0, 0.0))
 	bot_defs.append(_make_bot("combat_drone", "Combat Drone", "Follows you, fights", Color(0.8, 0.2, 0.2),
 		BotData.BotCategory.FOLLOWER, BotData.BotRole.DEFENSE, 8, 50.0, 8.0, 120.0, 1.0, 100.0))
 	bot_defs.append(_make_bot("mining_drone", "Mining Drone", "Follows you, mines", Color(0.2, 0.8, 0.5),
