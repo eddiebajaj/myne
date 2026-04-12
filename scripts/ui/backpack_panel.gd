@@ -19,6 +19,7 @@ var _inspect_popup: PanelContainer = null
 var _inspect_dim: ColorRect = null
 var _inspect_ore_id: String = ""
 var _inspect_mineral_id: String = ""
+var _touch_y_handled_frame: int = -1  # Frame guard: signal already toggled backpack
 
 @onready var root_control: Control = $Root
 @onready var panel: PanelContainer = $Root/Panel
@@ -55,15 +56,14 @@ func _is_touch_device() -> bool:
 
 
 func _on_touch_y() -> void:
-	# Defer the toggle to end-of-frame.  On mobile-web with
-	# emulate_mouse_from_touch, the original InputEventScreenTouch and the
-	# synthetic InputEventMouseButton are delivered in the same input pass.
-	# If open() runs synchronously during signal emission the newly-visible
-	# BackpackPanel root (layer 50, MOUSE_FILTER_STOP) can intercept the
-	# synthetic event, routing it to the close_button or Root, which
-	# immediately closes the panel.  Deferring ensures all input events from
-	# the tap finish routing BEFORE the panel becomes visible.
-	call_deferred("toggle")
+	# Toggle synchronously — same pattern as _on_touch_b in mining_hud.
+	# TouchControls (layer 100) is above BackpackPanel (layer 50), so the
+	# Y button always captures the emulate_mouse_from_touch synthetic event
+	# before it can reach the backpack Root.  The per-frame debounce in
+	# toggle() prevents double-fire from the duplicate press.
+	# Record the frame so _unhandled_input skips its action_y check.
+	_touch_y_handled_frame = Engine.get_process_frames()
+	toggle()
 
 
 func _on_touch_b() -> void:
@@ -73,6 +73,10 @@ func _on_touch_b() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_backpack") or event.is_action_pressed("action_y"):
+		# Skip if the touch signal already handled this press on the same frame.
+		if _touch_y_handled_frame == Engine.get_process_frames():
+			get_viewport().set_input_as_handled()
+			return
 		toggle()
 		get_viewport().set_input_as_handled()
 	elif _is_open and (event.is_action_pressed("ui_cancel") or event.is_action_pressed("action_b")):
