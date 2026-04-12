@@ -190,9 +190,10 @@ func _rebuild_ore_list() -> void:
 		btn.disabled = not can_afford
 		var oid: String = slot.ore.id
 		var mid := mineral_id
+		var bot := selected_bot  # Capture by value before _close_build_menu nulls it
 		btn.pressed.connect(func():
 			_close_build_menu()
-			bot_placer.select_bot_and_ore(selected_bot, oid, mid)
+			bot_placer.select_bot_and_ore(bot, oid, mid)
 		)
 		build_list.add_child(btn)
 	var back := Button.new()

@@ -29,6 +29,7 @@ signal action_a_pressed
 signal action_b_pressed
 
 var _backpack_toggle_frame: int = -1
+var _action_press_frame: Dictionary = {}  # action_name -> last frame pressed (debounce)
 var _joy_touch_index: int = -1
 var _joy_center: Vector2 = Vector2.ZERO
 var _joy_knob: ColorRect = null
@@ -319,11 +320,15 @@ func _on_button_gui_input(event: InputEvent, panel: Panel) -> void:
 
 
 func _press_action(action_name: String, panel: Panel) -> void:
+	# Debounce: emulate_mouse_from_touch causes duplicate presses per tap
+	var frame := Engine.get_process_frames()
+	if _action_press_frame.get(action_name, -1) == frame:
+		return
+	_action_press_frame[action_name] = frame
 	panel.modulate = Color(1.2, 1.2, 1.4, 1.0)
 	Input.action_press(action_name)
 	# Emit signal for reliable detection — consumers connect to these
 	if action_name == "action_a":
-		print("[TOUCH] action_a_pressed signal emitting, listeners=%d" % action_a_pressed.get_connections().size())
 		action_a_pressed.emit()
 	elif action_name == "action_b":
 		action_b_pressed.emit()
