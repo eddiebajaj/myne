@@ -17,6 +17,7 @@ var bot_placer: BotPlacer = null
 var build_step: int = 0  # 0=closed, 1=pick bot, 2=pick ore
 var selected_bot: BotData = null
 var cancel_placement_btn: Button = null
+var _touch_b_handled_frame: int = -1  # Frame guard: signal already toggled build menu
 
 
 func _ready() -> void:
@@ -94,6 +95,7 @@ func set_player(player: Player) -> void:
 func _on_touch_b() -> void:
 	if bot_placer and bot_placer.placing:
 		return
+	_touch_b_handled_frame = Engine.get_process_frames()
 	if build_panel.visible:
 		_close_build_menu()
 	else:
@@ -102,6 +104,11 @@ func _on_touch_b() -> void:
 
 func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
+		# Skip if the touch signal already handled this press on the same frame.
+		# Without this guard, the signal opens the menu during input processing,
+		# then _process sees is_action_just_pressed and immediately closes it.
+		if _touch_b_handled_frame == Engine.get_process_frames():
+			return
 		# Don't toggle menu while bot_placer is in placement mode — it handles its own cancel
 		if bot_placer and bot_placer.placing:
 			return

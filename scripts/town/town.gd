@@ -15,6 +15,7 @@ extends Node2D
 var mine_entrance_in_range: bool = false
 var mine_panel_open: bool = false
 var selected_checkpoint: int = 0
+var _touch_b_handled_frame: int = -1
 var town_gold_label: Label = null
 var town_battery_label: Label = null
 
@@ -276,6 +277,7 @@ func _on_touch_a() -> void:
 
 func _on_touch_b() -> void:
 	if mine_panel_open:
+		_touch_b_handled_frame = Engine.get_process_frames()
 		_close_mine_panel()
 
 
@@ -285,6 +287,8 @@ func _process(_delta: float) -> void:
 		_refresh_stats()
 	# B closes mine panel (keyboard fallback)
 	if mine_panel_open and Input.is_action_just_pressed("action_b"):
+		if _touch_b_handled_frame == Engine.get_process_frames():
+			return
 		_close_mine_panel()
 		return
 	# Mine entrance interaction (keyboard fallback)

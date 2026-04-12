@@ -4,6 +4,7 @@ extends Area2D
 
 var player_in_range: bool = false
 var menu_open: bool = false
+var _touch_b_handled_frame: int = -1
 
 # Pickaxe upgrade costs per tier (tier 1→2, 2→3, 3→4) — spec §3.1
 const PICKAXE_COSTS: Array[int] = [0, 40, 120, 320]
@@ -53,11 +54,14 @@ func _on_touch_a() -> void:
 
 func _on_touch_b() -> void:
 	if menu_open:
+		_touch_b_handled_frame = Engine.get_process_frames()
 		_close_menu()
 
 
 func _process(_delta: float) -> void:
 	if menu_open and Input.is_action_just_pressed("action_b"):
+		if _touch_b_handled_frame == Engine.get_process_frames():
+			return
 		_close_menu()
 		return
 	if player_in_range and not menu_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):

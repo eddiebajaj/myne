@@ -21,6 +21,8 @@ var placing: bool = false
 var ghost: ColorRect = null
 var emergency_battery_used_this_floor: bool = false
 var _player: Player = null
+var _touch_a_handled_frame: int = -1
+var _touch_b_handled_frame: int = -1
 
 
 func _ready() -> void:
@@ -37,12 +39,14 @@ func _ready() -> void:
 func _on_touch_a() -> void:
 	if not placing or _player == null:
 		return
+	_touch_a_handled_frame = Engine.get_process_frames()
 	var target_pos: Vector2 = _player.global_position + _player.facing_dir * GHOST_OFFSET
 	_confirm_placement(target_pos)
 
 
 func _on_touch_b() -> void:
 	if placing:
+		_touch_b_handled_frame = Engine.get_process_frames()
 		_cancel_placement()
 
 
@@ -57,9 +61,9 @@ func _process(_delta: float) -> void:
 	var target_pos: Vector2 = _player.global_position + _player.facing_dir * GHOST_OFFSET
 	ghost.global_position = target_pos - ghost.size / 2
 	# Keyboard/controller: confirm with Space/Enter, cancel with Esc/B key
-	if Input.is_action_just_pressed("action_a") or Input.is_action_just_pressed("mine"):
+	if (Input.is_action_just_pressed("action_a") or Input.is_action_just_pressed("mine")) and _touch_a_handled_frame != Engine.get_process_frames():
 		_confirm_placement(target_pos)
-	if Input.is_action_just_pressed("action_b"):
+	if Input.is_action_just_pressed("action_b") and _touch_b_handled_frame != Engine.get_process_frames():
 		_cancel_placement()
 
 

@@ -9,6 +9,7 @@ const BATTERY_PRICE := 8  # Gold per battery
 
 var player_in_range: bool = false
 var menu_open: bool = false
+var _touch_b_handled_frame: int = -1
 
 @onready var sprite: ColorRect = $Sprite
 @onready var label: Label = $Label
@@ -59,11 +60,14 @@ func _on_touch_a() -> void:
 
 func _on_touch_b() -> void:
 	if menu_open:
+		_touch_b_handled_frame = Engine.get_process_frames()
 		_close_menu()
 
 
 func _process(_delta: float) -> void:
 	if menu_open and Input.is_action_just_pressed("action_b"):
+		if _touch_b_handled_frame == Engine.get_process_frames():
+			return
 		_close_menu()
 		return
 	if player_in_range and not menu_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
