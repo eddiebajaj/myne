@@ -1,7 +1,7 @@
 extends CanvasLayer
 ## Virtual touch controls for mobile web play.
-## Shows a virtual joystick (bottom-left), A/B action buttons (bottom-right),
-## and a Bag button (top-right).  Console-style layout.
+## Shows a virtual joystick (bottom-left) and A/B/Y action buttons
+## (bottom-right, console diamond layout).  Y toggles the backpack.
 ## Uses Godot's built-in GUI input system (gui_input signals).
 
 const BUTTON_ALPHA := 0.45
@@ -27,9 +27,7 @@ var joystick_dir: Vector2 = Vector2.ZERO
 ## by the time _process runs).
 signal action_a_pressed
 signal action_b_pressed
-signal bag_pressed
-
-var _backpack_toggle_frame: int = -1
+signal action_y_pressed
 var _action_press_frame: Dictionary = {}  # action_name -> last frame pressed (debounce)
 var _joy_touch_index: int = -1
 var _joy_center: Vector2 = Vector2.ZERO
@@ -63,8 +61,7 @@ func _build_ui() -> void:
 	add_child(root_control)
 
 	_build_joystick(root_control)
-	_build_ab_buttons(root_control)
-	_build_backpack_button(root_control)
+	_build_action_buttons(root_control)
 
 
 # ─── Virtual Joystick ───────────────────────────────────────────────
@@ -176,9 +173,9 @@ func _reset_joystick() -> void:
 	_joy_knob.position = Vector2(knob_offset, knob_offset)
 
 
-# ─── A / B Buttons ──────────────────────────────────────────────────
+# ─── A / B / Y Buttons ──────────────────────────────────────────────
 
-func _build_ab_buttons(parent: Control) -> void:
+func _build_action_buttons(parent: Control) -> void:
 	# A button — large, bottom-right
 	var a_pos := Vector2(
 		float(VIEWPORT_W) - BTN_A_SIZE - 40.0,
@@ -194,6 +191,14 @@ func _build_ab_buttons(parent: Control) -> void:
 	)
 	var btn_b := _create_action_button("B", b_pos, BTN_B_SIZE, "action_b")
 	parent.add_child(btn_b)
+
+	# Y button — above A (console diamond: Y top, B left, A right)
+	var y_pos := Vector2(
+		a_pos.x + (BTN_A_SIZE - BTN_B_SIZE) * 0.5,  # horizontally centered with A
+		a_pos.y - BTN_B_SIZE - 15.0
+	)
+	var btn_y := _create_action_button("Y", y_pos, BTN_B_SIZE, "action_y")
+	parent.add_child(btn_y)
 
 
 func _create_action_button(text: String, pos: Vector2, btn_size: int, action_name: String) -> Panel:
@@ -231,71 +236,7 @@ func _create_action_button(text: String, pos: Vector2, btn_size: int, action_nam
 	return panel
 
 
-# ─── Bag Button (unchanged) ─────────────────────────────────────────
-
-func _build_backpack_button(parent: Control) -> void:
-	var size: int = 72
-	var pos: Vector2 = Vector2(float(VIEWPORT_W) - size - 16.0, 16.0)
-	var panel: Panel = Panel.new()
-	panel.name = "Btn_toggle_backpack"
-	panel.position = pos
-	panel.size = Vector2(size, size)
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(0.2, 0.2, 0.3, BUTTON_ALPHA)
-	style.corner_radius_top_left = 12
-	style.corner_radius_top_right = 12
-	style.corner_radius_bottom_left = 12
-	style.corner_radius_bottom_right = 12
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_color = Color(0.8, 0.8, 0.9, BUTTON_ALPHA)
-	panel.add_theme_stylebox_override("panel", style)
-	var label: Label = Label.new()
-	label.text = "Bag"
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.size = Vector2(size, size)
-	label.add_theme_font_size_override("font_size", 22)
-	label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(label)
-	panel.set_meta("action_name", "toggle_backpack")
-	panel.gui_input.connect(_on_backpack_btn_input.bind(panel))
-	parent.add_child(panel)
-
-
-func _on_backpack_btn_input(event: InputEvent, panel: Panel) -> void:
-	var is_press: bool = false
-	var is_release: bool = false
-	if event is InputEventScreenTouch:
-		var t: InputEventScreenTouch = event
-		is_press = t.pressed
-		is_release = not t.pressed
-		panel.accept_event()
-	elif event is InputEventMouseButton:
-		var mb: InputEventMouseButton = event
-		if mb.button_index != MOUSE_BUTTON_LEFT:
-			return
-		is_press = mb.pressed
-		is_release = not mb.pressed
-		panel.accept_event()
-	else:
-		return
-	if is_press:
-		var current_frame: int = Engine.get_process_frames()
-		if current_frame == _backpack_toggle_frame:
-			return
-		_backpack_toggle_frame = current_frame
-		panel.modulate = Color(1.2, 1.2, 1.4, 1.0)
-		bag_pressed.emit()
-	elif is_release:
-		panel.modulate = Color(1, 1, 1, 1)
-
-
-# ─── Shared button handler for A / B ────────────────────────────────
+# ─── Shared button handler for A / B / Y ────────────────────────────
 
 func _on_button_gui_input(event: InputEvent, panel: Panel) -> void:
 	var action_name: String = panel.get_meta("action_name")
@@ -331,6 +272,8 @@ func _press_action(action_name: String, panel: Panel) -> void:
 		action_a_pressed.emit()
 	elif action_name == "action_b":
 		action_b_pressed.emit()
+	elif action_name == "action_y":
+		action_y_pressed.emit()
 
 
 func _release_action(action_name: String, panel: Panel) -> void:

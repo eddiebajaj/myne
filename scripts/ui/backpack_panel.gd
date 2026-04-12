@@ -43,7 +43,7 @@ func _ready() -> void:
 	var touch := get_node_or_null("/root/TouchControls")
 	if touch:
 		touch.action_b_pressed.connect(_on_touch_b)
-		touch.bag_pressed.connect(_on_bag_tap)
+		touch.action_y_pressed.connect(_on_touch_y)
 
 
 func _is_touch_device() -> bool:
@@ -54,7 +54,7 @@ func _is_touch_device() -> bool:
 	return false
 
 
-func _on_bag_tap() -> void:
+func _on_touch_y() -> void:
 	# Defer the toggle to end-of-frame.  On mobile-web with
 	# emulate_mouse_from_touch, the original InputEventScreenTouch and the
 	# synthetic InputEventMouseButton are delivered in the same input pass.
@@ -72,7 +72,7 @@ func _on_touch_b() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_backpack"):
+	if event.is_action_pressed("toggle_backpack") or event.is_action_pressed("action_y"):
 		toggle()
 		get_viewport().set_input_as_handled()
 	elif _is_open and (event.is_action_pressed("ui_cancel") or event.is_action_pressed("action_b")):
