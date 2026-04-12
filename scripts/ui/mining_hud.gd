@@ -153,9 +153,15 @@ func _toggle_backpack_direct() -> void:
 		get_tree().paused = false
 	else:
 		bp._is_open = true
+		bp.visible = true  # Force CanvasLayer itself visible
+		bp.layer = 99      # Force above everything except TouchControls (100)
 		bp.root_control.visible = true
 		get_tree().paused = true
 		bp._refresh()
+		# Debug popup: show backpack state to diagnose visibility issues
+		var p = get_tree().get_first_node_in_group("player")
+		if p:
+			p.show_pickup_popup("BP bp=%s rc=%s vis=%s layer=%s" % [bp != null, bp.root_control != null, bp.root_control.visible if bp.root_control else "N/A", bp.layer if bp else "N/A"])
 
 
 func _open_build_step1() -> void:
