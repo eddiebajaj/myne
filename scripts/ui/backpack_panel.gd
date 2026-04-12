@@ -40,6 +40,9 @@ func _ready() -> void:
 	_cell_size = CELL_SIZE_MOBILE if _is_touch_device() else CELL_SIZE_DESKTOP
 	grid_container.columns = GRID_COLS
 	Inventory.inventory_changed.connect(_refresh)
+	var touch := get_node_or_null("/root/TouchControls")
+	if touch:
+		touch.action_b_pressed.connect(_on_touch_b)
 
 
 func _is_touch_device() -> bool:
@@ -48,6 +51,11 @@ func _is_touch_device() -> bool:
 	if OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios"):
 		return true
 	return false
+
+
+func _on_touch_b() -> void:
+	if _is_open:
+		close()
 
 
 func _unhandled_input(event: InputEvent) -> void:

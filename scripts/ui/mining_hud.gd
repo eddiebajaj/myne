@@ -17,7 +17,6 @@ var bot_placer: BotPlacer = null
 var build_step: int = 0  # 0=closed, 1=pick bot, 2=pick ore
 var selected_bot: BotData = null
 var cancel_placement_btn: Button = null
-var _b_was_pressed: bool = false
 
 
 func _ready() -> void:
@@ -26,6 +25,9 @@ func _ready() -> void:
 	GameManager.floor_changed.connect(_on_floor_changed)
 	build_panel.visible = false
 	full_warning.visible = false
+	var touch := get_node_or_null("/root/TouchControls")
+	if touch:
+		touch.action_b_pressed.connect(_on_touch_b)
 	_update_backpack()
 	_update_extras()
 	_on_floor_changed(GameManager.current_floor)
@@ -89,11 +91,17 @@ func set_player(player: Player) -> void:
 	_on_health_changed(player.health, player.max_health, player.armor, player.max_armor)
 
 
+func _on_touch_b() -> void:
+	if bot_placer and bot_placer.placing:
+		return
+	if build_panel.visible:
+		_close_build_menu()
+	else:
+		_open_build_step1()
+
+
 func _process(_delta: float) -> void:
-	var b_pressed := Input.is_action_pressed("action_b")
-	var b_just = b_pressed and not _b_was_pressed
-	_b_was_pressed = b_pressed
-	if b_just or Input.is_action_just_pressed("build_menu"):
+	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
 		# Don't toggle menu while bot_placer is in placement mode — it handles its own cancel
 		if bot_placer and bot_placer.placing:
 			return

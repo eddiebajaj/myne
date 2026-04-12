@@ -20,6 +20,14 @@ const BTN_B_SIZE := 80
 ## Public joystick direction vector — read by player.gd for movement.
 var joystick_dir: Vector2 = Vector2.ZERO
 
+## Signals emitted on A/B tap. Consumers connect to these for reliable
+## touch input — Input.is_action_just_pressed doesn't work with synthetic
+## Input.action_press() calls due to frame timing (press+release both
+## fire in the same input phase, so is_action_pressed is already false
+## by the time _process runs).
+signal action_a_pressed
+signal action_b_pressed
+
 var _backpack_toggle_frame: int = -1
 var _joy_touch_index: int = -1
 var _joy_center: Vector2 = Vector2.ZERO
@@ -313,6 +321,11 @@ func _on_button_gui_input(event: InputEvent, panel: Panel) -> void:
 func _press_action(action_name: String, panel: Panel) -> void:
 	panel.modulate = Color(1.2, 1.2, 1.4, 1.0)
 	Input.action_press(action_name)
+	# Emit signal for reliable detection — consumers connect to these
+	if action_name == "action_a":
+		action_a_pressed.emit()
+	elif action_name == "action_b":
+		action_b_pressed.emit()
 
 
 func _release_action(action_name: String, panel: Panel) -> void:

@@ -9,8 +9,6 @@ const BATTERY_PRICE := 8  # Gold per battery
 
 var player_in_range: bool = false
 var menu_open: bool = false
-var _a_was_pressed: bool = false
-var _b_was_pressed: bool = false
 
 @onready var sprite: ColorRect = $Sprite
 @onready var label: Label = $Label
@@ -42,6 +40,10 @@ func _ready() -> void:
 	close_button.pressed.connect(_close_menu)
 	# Allow _process to run while paused so B-button can close the menu.
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	var touch := get_node_or_null("/root/TouchControls")
+	if touch:
+		touch.action_a_pressed.connect(_on_touch_a)
+		touch.action_b_pressed.connect(_on_touch_b)
 	# Replace single inventory_label with a breakdown container.
 	inventory_label.visible = false
 	_breakdown_container = VBoxContainer.new()
@@ -50,17 +52,21 @@ func _ready() -> void:
 	menu_vbox.move_child(_breakdown_container, inventory_label.get_index() + 1)
 
 
+func _on_touch_a() -> void:
+	if player_in_range and not menu_open:
+		_open_menu()
+
+
+func _on_touch_b() -> void:
+	if menu_open:
+		_close_menu()
+
+
 func _process(_delta: float) -> void:
-	var a_pressed := Input.is_action_pressed("action_a")
-	var a_just = a_pressed and not _a_was_pressed
-	_a_was_pressed = a_pressed
-	var b_pressed := Input.is_action_pressed("action_b")
-	var b_just = b_pressed and not _b_was_pressed
-	_b_was_pressed = b_pressed
-	if menu_open and b_just:
+	if menu_open and Input.is_action_just_pressed("action_b"):
 		_close_menu()
 		return
-	if player_in_range and not menu_open and (Input.is_action_just_pressed("interact") or a_just):
+	if player_in_range and not menu_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
 		_open_menu()
 
 

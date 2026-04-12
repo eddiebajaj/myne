@@ -4,8 +4,6 @@ extends Area2D
 
 var player_in_range: bool = false
 var menu_open: bool = false
-var _a_was_pressed: bool = false
-var _b_was_pressed: bool = false
 
 # Pickaxe upgrade costs per tier (tier 1→2, 2→3, 3→4) — spec §3.1
 const PICKAXE_COSTS: Array[int] = [0, 40, 120, 320]
@@ -42,19 +40,27 @@ func _ready() -> void:
 	close_button.pressed.connect(_close_menu)
 	# Allow _process to run while paused so B-button can close the menu.
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	var touch := get_node_or_null("/root/TouchControls")
+	if touch:
+		touch.action_a_pressed.connect(_on_touch_a)
+		touch.action_b_pressed.connect(_on_touch_b)
+
+
+func _on_touch_a() -> void:
+	if player_in_range and not menu_open:
+		_open_menu()
+
+
+func _on_touch_b() -> void:
+	if menu_open:
+		_close_menu()
 
 
 func _process(_delta: float) -> void:
-	var a_pressed := Input.is_action_pressed("action_a")
-	var a_just = a_pressed and not _a_was_pressed
-	_a_was_pressed = a_pressed
-	var b_pressed := Input.is_action_pressed("action_b")
-	var b_just = b_pressed and not _b_was_pressed
-	_b_was_pressed = b_pressed
-	if menu_open and b_just:
+	if menu_open and Input.is_action_just_pressed("action_b"):
 		_close_menu()
 		return
-	if player_in_range and not menu_open and (Input.is_action_just_pressed("interact") or a_just):
+	if player_in_range and not menu_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
 		_open_menu()
 
 

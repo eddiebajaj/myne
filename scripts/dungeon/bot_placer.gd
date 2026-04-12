@@ -21,24 +21,34 @@ var placing: bool = false
 var ghost: ColorRect = null
 var emergency_battery_used_this_floor: bool = false
 var _player: Player = null
-# Manual press-state tracking — Input.is_action_just_pressed doesn't reliably
-# detect synthetic Input.action_press() calls from touch controls due to frame
-# timing.  Track transitions ourselves instead.
-var _a_was_pressed: bool = false
-var _b_was_pressed: bool = false
 
 
 func _ready() -> void:
 	_create_bot_defs()
 	GameManager.floor_changed.connect(func(_f): emergency_battery_used_this_floor = false)
+	# Connect touch signals for reliable mobile input (signals fire synchronously,
+	# no frame-timing issues with synthetic Input.action_press).
+	var touch := get_node_or_null("/root/TouchControls")
+	if touch:
+		touch.action_a_pressed.connect(_on_touch_a)
+		touch.action_b_pressed.connect(_on_touch_b)
+
+
+func _on_touch_a() -> void:
+	if not placing or _player == null:
+		return
+	var target_pos: Vector2 = _player.global_position + _player.facing_dir * GHOST_OFFSET
+	_confirm_placement(target_pos)
+
+
+func _on_touch_b() -> void:
+	if placing:
+		_cancel_placement()
 
 
 func _process(_delta: float) -> void:
 	if not placing or ghost == null:
-		_a_was_pressed = Input.is_action_pressed("action_a")
-		_b_was_pressed = Input.is_action_pressed("action_b")
 		return
-	# Find the player if we don't have a reference yet
 	if _player == null:
 		_player = get_tree().get_first_node_in_group("player") as Player
 	if _player == null:
@@ -46,15 +56,11 @@ func _process(_delta: float) -> void:
 	# Ghost follows in front of the player based on facing direction
 	var target_pos: Vector2 = _player.global_position + _player.facing_dir * GHOST_OFFSET
 	ghost.global_position = target_pos - ghost.size / 2
-	# Detect press transitions (released → pressed) for confirm/cancel
-	var a_pressed := Input.is_action_pressed("action_a")
-	var b_pressed := Input.is_action_pressed("action_b")
-	if a_pressed and not _a_was_pressed:
+	# Keyboard/controller: confirm with Space/Enter, cancel with Esc/B key
+	if Input.is_action_just_pressed("action_a") or Input.is_action_just_pressed("mine"):
 		_confirm_placement(target_pos)
-	if b_pressed and not _b_was_pressed:
+	if Input.is_action_just_pressed("action_b"):
 		_cancel_placement()
-	_a_was_pressed = a_pressed
-	_b_was_pressed = b_pressed
 
 
 func select_bot_and_ore(bot_data: BotData, ore_id: String, mineral_id: String) -> void:

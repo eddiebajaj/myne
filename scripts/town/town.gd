@@ -25,8 +25,6 @@ var mine_panel: PanelContainer = null
 var mine_panel_options: VBoxContainer = null
 var mine_panel_enter_button: Button = null
 var mine_panel_option_buttons: Array[Button] = []
-var _a_was_pressed: bool = false
-var _b_was_pressed: bool = false
 
 
 func _ready() -> void:
@@ -52,6 +50,10 @@ func _ready() -> void:
 	GameManager.gold_changed.connect(_on_gold_changed)
 	GameManager.checkpoint_reached.connect(_on_checkpoint_reached)
 	Inventory.inventory_changed.connect(_refresh_persistent_hud)
+	var touch := get_node_or_null("/root/TouchControls")
+	if touch:
+		touch.action_a_pressed.connect(_on_touch_a)
+		touch.action_b_pressed.connect(_on_touch_b)
 	_refresh_stats()
 
 
@@ -267,23 +269,26 @@ func _refresh_stats() -> void:
 	sell_button.text = "Sell All Ore (%d pieces)" % ore_count
 
 
+func _on_touch_a() -> void:
+	if mine_entrance_in_range and not mine_panel_open:
+		_open_mine_panel()
+
+
+func _on_touch_b() -> void:
+	if mine_panel_open:
+		_close_mine_panel()
+
+
 func _process(_delta: float) -> void:
 	# Refresh stats periodically (after NPC interactions)
 	if Engine.get_physics_frames() % 30 == 0:
 		_refresh_stats()
-	# Manual press-transition tracking for synthetic touch actions
-	var a_pressed := Input.is_action_pressed("action_a")
-	var a_just = a_pressed and not _a_was_pressed
-	_a_was_pressed = a_pressed
-	var b_pressed := Input.is_action_pressed("action_b")
-	var b_just = b_pressed and not _b_was_pressed
-	_b_was_pressed = b_pressed
-	# B closes mine panel
-	if mine_panel_open and b_just:
+	# B closes mine panel (keyboard fallback)
+	if mine_panel_open and Input.is_action_just_pressed("action_b"):
 		_close_mine_panel()
 		return
-	# Mine entrance interaction — match NPC menu pattern.
-	if mine_entrance_in_range and not mine_panel_open and (Input.is_action_just_pressed("interact") or a_just):
+	# Mine entrance interaction (keyboard fallback)
+	if mine_entrance_in_range and not mine_panel_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
 		_open_mine_panel()
 
 
