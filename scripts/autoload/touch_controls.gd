@@ -273,6 +273,10 @@ func _press_action(action_name: String, panel: Panel) -> void:
 	elif action_name == "action_b":
 		action_b_pressed.emit()
 	elif action_name == "action_y":
+		# DEBUG: confirm _press_action fires for Y
+		var _p = get_tree().get_first_node_in_group("player")
+		if _p and _p.has_method("show_pickup_popup"):
+			_p.show_pickup_popup("Y PRESS f=%d conns=%d" % [frame, action_y_pressed.get_connections().size()])
 		action_y_pressed.emit()
 
 

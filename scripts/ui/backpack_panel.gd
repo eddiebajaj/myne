@@ -45,6 +45,10 @@ func _ready() -> void:
 	if touch:
 		touch.action_b_pressed.connect(_on_touch_b)
 		touch.action_y_pressed.connect(_on_touch_y)
+		# DEBUG: print connection count at startup
+		print("[BackpackPanel._ready] action_y_pressed connections: ", touch.action_y_pressed.get_connections().size())
+	else:
+		print("[BackpackPanel._ready] WARNING: TouchControls not found!")
 
 
 func _is_touch_device() -> bool:
@@ -56,6 +60,10 @@ func _is_touch_device() -> bool:
 
 
 func _on_touch_y() -> void:
+	# DEBUG: confirm signal handler fires
+	var _p = get_tree().get_first_node_in_group("player")
+	if _p and _p.has_method("show_pickup_popup"):
+		_p.show_pickup_popup("Y SIGNAL f=%d" % Engine.get_process_frames())
 	# Toggle synchronously — same pattern as _on_touch_b in mining_hud.
 	# TouchControls (layer 100) is above BackpackPanel (layer 50), so the
 	# Y button always captures the emulate_mouse_from_touch synthetic event
@@ -90,6 +98,10 @@ var _open_frame: int = -1  # Frame when open() was called — block close() on s
 func toggle() -> void:
 	# Guard against double-toggle in the same frame
 	var frame := Engine.get_process_frames()
+	# DEBUG: confirm toggle fires
+	var _p = get_tree().get_first_node_in_group("player")
+	if _p and _p.has_method("show_pickup_popup"):
+		_p.show_pickup_popup("Y TOGGLE open=%s f=%d tf=%d" % [str(_is_open), frame, _toggle_frame])
 	if _toggle_frame == frame:
 		return
 	_toggle_frame = frame
@@ -100,6 +112,10 @@ func toggle() -> void:
 
 
 func open() -> void:
+	# DEBUG: confirm open fires
+	var _p = get_tree().get_first_node_in_group("player")
+	if _p and _p.has_method("show_pickup_popup"):
+		_p.show_pickup_popup("Y OPEN wasOpen=%s" % str(_is_open))
 	if _is_open:
 		return
 	_is_open = true
@@ -115,6 +131,10 @@ func open() -> void:
 
 
 func close() -> void:
+	# DEBUG: confirm close fires
+	var _p2 = get_tree().get_first_node_in_group("player")
+	if _p2 and _p2.has_method("show_pickup_popup"):
+		_p2.show_pickup_popup("Y CLOSE isOpen=%s of=%d" % [str(_is_open), _open_frame])
 	if not _is_open:
 		return
 	# Block close on the exact same frame as open — prevents open-then-close
