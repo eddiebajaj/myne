@@ -39,11 +39,11 @@ func _process(_delta: float) -> void:
 	# Ghost follows in front of the player based on facing direction
 	var target_pos: Vector2 = _player.global_position + _player.facing_dir * GHOST_OFFSET
 	ghost.global_position = target_pos - ghost.size / 2
-	# Confirm placement with Mine/Space button
-	if Input.is_action_just_pressed("mine"):
+	# Confirm placement with A button / Space
+	if Input.is_action_just_pressed("action_a"):
 		_confirm_placement(target_pos)
-	# Cancel with build_menu toggle (B key / Bld button)
-	if Input.is_action_just_pressed("build_menu"):
+	# Cancel with B button / Escape
+	if Input.is_action_just_pressed("action_b"):
 		_cancel_placement()
 
 

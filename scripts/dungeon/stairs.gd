@@ -16,15 +16,15 @@ func _ready() -> void:
 	body_exited.connect(_on_body_exited)
 	if stair_type == StairType.DOWN:
 		sprite.color = Color(0.3, 0.3, 0.7)
-		label.text = "Stairs Down [E]"
+		label.text = "Stairs Down [E/A]"
 	else:
 		sprite.color = Color(0.2, 0.7, 0.3)
-		label.text = "Return to Town [E]"
+		label.text = "Return to Town [E/A]"
 	label.visible = false
 
 
 func _process(_delta: float) -> void:
-	if player_in_range and Input.is_action_just_pressed("interact"):
+	if player_in_range and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
 		if stair_type == StairType.DOWN:
 			GameManager.go_deeper()
 			# Reload the floor scene to generate a new floor

@@ -41,7 +41,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if player_in_range and not menu_open and Input.is_action_just_pressed("interact"):
+	if player_in_range and not menu_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
 		_open_menu()
 
 

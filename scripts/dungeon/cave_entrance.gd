@@ -18,7 +18,7 @@ func _ready() -> void:
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
 	sprite.color = Color(0.6, 0.1, 0.1)
-	label.text = "Cave [E]"
+	label.text = "Cave [E/A]"
 	label.visible = false
 	_roll_cave_contents()
 	_build_visual_states()
@@ -73,7 +73,7 @@ func _build_visual_states() -> void:
 
 
 func _process(_delta: float) -> void:
-	if player_in_range and not activated and Input.is_action_just_pressed("interact"):
+	if player_in_range and not activated and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
 		_activate()
 
 

@@ -261,7 +261,7 @@ func _process(_delta: float) -> void:
 	if Engine.get_physics_frames() % 30 == 0:
 		_refresh_stats()
 	# Mine entrance interaction — match NPC menu pattern.
-	if mine_entrance_in_range and not mine_panel_open and Input.is_action_just_pressed("interact"):
+	if mine_entrance_in_range and not mine_panel_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
 		_open_mine_panel()
 
 

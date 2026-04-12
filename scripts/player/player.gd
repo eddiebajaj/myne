@@ -70,6 +70,10 @@ func _physics_process(_delta: float) -> void:
 		Input.get_axis("move_left", "move_right"),
 		Input.get_axis("move_up", "move_down")
 	)
+	# Merge with touch joystick if active
+	var touch = get_node_or_null("/root/TouchControls")
+	if touch and touch.joystick_dir.length() > 0.1:
+		input_dir = touch.joystick_dir
 	if input_dir.length() > 0:
 		# Snap facing to 4 cardinals for crisp readability.
 		if absf(input_dir.x) >= absf(input_dir.y):
@@ -81,7 +85,7 @@ func _physics_process(_delta: float) -> void:
 	_update_pickaxe_position()
 	_update_facing_visuals()
 
-	if Input.is_action_just_pressed("mine") and can_swing and not get_meta("bot_placing", false):
+	if (Input.is_action_just_pressed("action_a") or Input.is_action_just_pressed("mine")) and can_swing and not get_meta("bot_placing", false):
 		swing_pickaxe()
 
 

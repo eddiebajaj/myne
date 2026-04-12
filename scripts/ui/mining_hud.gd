@@ -71,7 +71,7 @@ func _on_placement_started(_bot_data: BotData) -> void:
 		cancel_placement_btn.visible = true
 	# Show placement hint
 	if full_warning:
-		full_warning.text = "Walk to position bot, tap Mine to place"
+		full_warning.text = "Walk to position bot, tap A to place"
 		full_warning.visible = true
 
 
@@ -89,7 +89,7 @@ func set_player(player: Player) -> void:
 
 
 func _process(_delta: float) -> void:
-	if Input.is_action_just_pressed("build_menu"):
+	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
 		# Don't toggle menu while bot_placer is in placement mode — it handles its own cancel
 		if bot_placer and bot_placer.placing:
 			return

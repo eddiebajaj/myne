@@ -54,7 +54,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_backpack"):
 		toggle()
 		get_viewport().set_input_as_handled()
-	elif _is_open and event.is_action_pressed("ui_cancel"):
+	elif _is_open and (event.is_action_pressed("ui_cancel") or event.is_action_pressed("action_b")):
 		close()
 		get_viewport().set_input_as_handled()
 
