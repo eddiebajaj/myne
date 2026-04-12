@@ -27,6 +27,7 @@ var joystick_dir: Vector2 = Vector2.ZERO
 ## by the time _process runs).
 signal action_a_pressed
 signal action_b_pressed
+signal bag_pressed
 
 var _backpack_toggle_frame: int = -1
 var _action_press_frame: Dictionary = {}  # action_name -> last frame pressed (debounce)
@@ -267,10 +268,6 @@ func _build_backpack_button(parent: Control) -> void:
 
 
 func _on_backpack_btn_input(event: InputEvent, panel: Panel) -> void:
-	# Debug: show what events reach the Bag button
-	var p = get_tree().get_first_node_in_group("player")
-	if p and p.has_method("show_pickup_popup"):
-		p.show_pickup_popup("BAG evt=%s" % event.get_class())
 	var is_press: bool = false
 	var is_release: bool = false
 	if event is InputEventScreenTouch:
@@ -290,16 +287,10 @@ func _on_backpack_btn_input(event: InputEvent, panel: Panel) -> void:
 	if is_press:
 		var current_frame: int = Engine.get_process_frames()
 		if current_frame == _backpack_toggle_frame:
-			if p and p.has_method("show_pickup_popup"):
-				p.show_pickup_popup("BAG debounced f=%d" % current_frame)
 			return
 		_backpack_toggle_frame = current_frame
 		panel.modulate = Color(1.2, 1.2, 1.4, 1.0)
-		var bp: Node = get_node_or_null("/root/BackpackPanel")
-		if p and p.has_method("show_pickup_popup"):
-			p.show_pickup_popup("BAG bp=%s has_toggle=%s" % [bp != null, bp.has_method("toggle") if bp else "N/A"])
-		if bp and bp.has_method("toggle"):
-			bp.call("toggle")
+		bag_pressed.emit()
 	elif is_release:
 		panel.modulate = Color(1, 1, 1, 1)
 

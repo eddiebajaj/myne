@@ -43,6 +43,7 @@ func _ready() -> void:
 	var touch := get_node_or_null("/root/TouchControls")
 	if touch:
 		touch.action_b_pressed.connect(_on_touch_b)
+		touch.bag_pressed.connect(_on_bag_tap)
 
 
 func _is_touch_device() -> bool:
@@ -51,6 +52,10 @@ func _is_touch_device() -> bool:
 	if OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios"):
 		return true
 	return false
+
+
+func _on_bag_tap() -> void:
+	toggle()
 
 
 func _on_touch_b() -> void:
@@ -67,13 +72,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-var _toggle_count: int = 0
+var _toggle_frame: int = -1
 
 func toggle() -> void:
-	_toggle_count += 1
-	var p = get_tree().get_first_node_in_group("player")
-	if p and p.has_method("show_pickup_popup"):
-		p.show_pickup_popup("BAG toggle#%d open=%s f=%d" % [_toggle_count, _is_open, Engine.get_process_frames()])
+	# Guard against double-toggle in the same frame
+	var frame := Engine.get_process_frames()
+	if _toggle_frame == frame:
+		return
+	_toggle_frame = frame
 	if _is_open:
 		close()
 	else:
@@ -89,9 +95,6 @@ func open() -> void:
 
 
 func close() -> void:
-	var p = get_tree().get_first_node_in_group("player")
-	if p and p.has_method("show_pickup_popup"):
-		p.show_pickup_popup("BAG close f=%d" % Engine.get_process_frames())
 	_is_open = false
 	_close_inspect_popup()
 	root_control.visible = false
