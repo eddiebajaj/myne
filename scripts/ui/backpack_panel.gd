@@ -67,7 +67,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+var _toggle_count: int = 0
+
 func toggle() -> void:
+	_toggle_count += 1
+	var p = get_tree().get_first_node_in_group("player")
+	if p and p.has_method("show_pickup_popup"):
+		p.show_pickup_popup("BAG toggle#%d open=%s f=%d" % [_toggle_count, _is_open, Engine.get_process_frames()])
 	if _is_open:
 		close()
 	else:
@@ -83,6 +89,9 @@ func open() -> void:
 
 
 func close() -> void:
+	var p = get_tree().get_first_node_in_group("player")
+	if p and p.has_method("show_pickup_popup"):
+		p.show_pickup_popup("BAG close f=%d" % Engine.get_process_frames())
 	_is_open = false
 	_close_inspect_popup()
 	root_control.visible = false
