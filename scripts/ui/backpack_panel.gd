@@ -19,9 +19,6 @@ var _inspect_popup: PanelContainer = null
 var _inspect_dim: ColorRect = null
 var _inspect_ore_id: String = ""
 var _inspect_mineral_id: String = ""
-var _touch_y_handled_frame: int = -1  # Frame guard: signal already toggled backpack
-var _touch_connected: bool = false
-
 @onready var root_control: Control = $Root
 @onready var panel: PanelContainer = $Root/Panel
 @onready var title_label: Label = $Root/Panel/VBox/HeaderRow/TitleLabel
@@ -42,8 +39,6 @@ func _ready() -> void:
 	_cell_size = CELL_SIZE_MOBILE if _is_touch_device() else CELL_SIZE_DESKTOP
 	grid_container.columns = GRID_COLS
 	Inventory.inventory_changed.connect(_refresh)
-	# Touch signal connections are deferred to _process to avoid autoload
-	# initialization timing issues (_ready order is not guaranteed to work).
 
 
 func _is_touch_device() -> bool:
@@ -54,34 +49,10 @@ func _is_touch_device() -> bool:
 	return false
 
 
-func _process(_delta: float) -> void:
-	if not _touch_connected:
-		var touch = get_node_or_null("/root/TouchControls")
-		if touch and touch.has_signal("action_y_pressed"):
-			if not touch.action_y_pressed.is_connected(_on_touch_y):
-				touch.action_y_pressed.connect(_on_touch_y)
-			if not touch.action_b_pressed.is_connected(_on_touch_b):
-				touch.action_b_pressed.connect(_on_touch_b)
-			_touch_connected = true
-
-
-func _on_touch_y() -> void:
-	# Record the frame so _unhandled_input skips its action_y check.
-	_touch_y_handled_frame = Engine.get_process_frames()
-	toggle()
-
-
-func _on_touch_b() -> void:
-	if _is_open:
-		close()  # close() already guards against same-frame-as-open
-
-
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("toggle_backpack") or event.is_action_pressed("action_y"):
-		# Skip if the touch signal already handled this press on the same frame.
-		if _touch_y_handled_frame == Engine.get_process_frames():
-			get_viewport().set_input_as_handled()
-			return
+	# Desktop Tab key toggle (toggle_backpack action). Touch Y is handled by
+	# mining_hud via the TouchControls signal — no autoload timing issues.
+	if event.is_action_pressed("toggle_backpack"):
 		toggle()
 		get_viewport().set_input_as_handled()
 	elif _is_open and (event.is_action_pressed("ui_cancel") or event.is_action_pressed("action_b")):

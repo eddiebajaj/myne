@@ -18,6 +18,7 @@ var build_step: int = 0  # 0=closed, 1=pick bot, 2=pick ore
 var selected_bot: BotData = null
 var cancel_placement_btn: Button = null
 var _touch_b_handled_frame: int = -1  # Frame guard: signal already toggled build menu
+var _touch_y_handled_frame: int = -1  # Frame guard: signal already toggled backpack
 
 
 func _ready() -> void:
@@ -29,6 +30,7 @@ func _ready() -> void:
 	var touch := get_node_or_null("/root/TouchControls")
 	if touch:
 		touch.action_b_pressed.connect(_on_touch_b)
+		touch.action_y_pressed.connect(_on_touch_y)
 	_update_backpack()
 	_update_extras()
 	_on_floor_changed(GameManager.current_floor)
@@ -102,7 +104,15 @@ func _on_touch_b() -> void:
 		_open_build_step1()
 
 
+func _on_touch_y() -> void:
+	_touch_y_handled_frame = Engine.get_process_frames()
+	var bp = get_node_or_null("/root/BackpackPanel")
+	if bp and bp.has_method("toggle"):
+		bp.toggle()
+
+
 func _process(_delta: float) -> void:
+	# --- B button: build menu toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
 		# Skip if the touch signal already handled this press on the same frame.
 		# Without this guard, the signal opens the menu during input processing,
@@ -116,6 +126,14 @@ func _process(_delta: float) -> void:
 			_close_build_menu()
 		else:
 			_open_build_step1()
+
+	# --- Y button: backpack toggle (keyboard fallback) ---
+	if Input.is_action_just_pressed("action_y"):
+		if _touch_y_handled_frame == Engine.get_process_frames():
+			return
+		var bp = get_node_or_null("/root/BackpackPanel")
+		if bp and bp.has_method("toggle"):
+			bp.toggle()
 
 
 func _open_build_step1() -> void:
