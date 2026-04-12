@@ -106,9 +106,11 @@ func _on_touch_b() -> void:
 
 func _on_touch_y() -> void:
 	_touch_y_handled_frame = Engine.get_process_frames()
-	var bp = get_node_or_null("/root/BackpackPanel")
-	if bp and bp.has_method("toggle"):
-		bp.toggle()
+	# Close build menu first if it's open
+	if build_panel.visible:
+		_close_build_menu()
+		return
+	_toggle_backpack_direct()
 
 
 func _process(_delta: float) -> void:
@@ -131,13 +133,40 @@ func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("action_y"):
 		if _touch_y_handled_frame == Engine.get_process_frames():
 			return
-		var bp = get_node_or_null("/root/BackpackPanel")
-		if bp and bp.has_method("toggle"):
-			bp.toggle()
+		# Close build menu first if it's open
+		if build_panel.visible:
+			_close_build_menu()
+			return
+		_toggle_backpack_direct()
+
+
+func _toggle_backpack_direct() -> void:
+	## Directly manipulate BackpackPanel state, bypassing its toggle/open/close
+	## guards which cause double-fire and frame-guard issues from cross-autoload calls.
+	var bp = get_node_or_null("/root/BackpackPanel")
+	if bp == null:
+		return
+	if bp._is_open:
+		bp._is_open = false
+		bp._close_inspect_popup()
+		bp.root_control.visible = false
+		get_tree().paused = false
+	else:
+		bp._is_open = true
+		bp.root_control.visible = true
+		get_tree().paused = true
+		bp._refresh()
 
 
 func _open_build_step1() -> void:
 	## Step 1: Pick bot type. Game pauses while menu is open.
+	# Close backpack first if it's open
+	var bp = get_node_or_null("/root/BackpackPanel")
+	if bp and bp._is_open:
+		bp._is_open = false
+		bp._close_inspect_popup()
+		bp.root_control.visible = false
+		# Don't unpause here — build menu will keep it paused
 	build_step = 1
 	selected_bot = null
 	build_panel.visible = true
