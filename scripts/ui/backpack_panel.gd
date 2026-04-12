@@ -55,7 +55,15 @@ func _is_touch_device() -> bool:
 
 
 func _on_bag_tap() -> void:
-	toggle()
+	# Defer the toggle to end-of-frame.  On mobile-web with
+	# emulate_mouse_from_touch, the original InputEventScreenTouch and the
+	# synthetic InputEventMouseButton are delivered in the same input pass.
+	# If open() runs synchronously during signal emission the newly-visible
+	# BackpackPanel root (layer 50, MOUSE_FILTER_STOP) can intercept the
+	# synthetic event, routing it to the close_button or Root, which
+	# immediately closes the panel.  Deferring ensures all input events from
+	# the tap finish routing BEFORE the panel becomes visible.
+	call_deferred("toggle")
 
 
 func _on_touch_b() -> void:
