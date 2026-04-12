@@ -19,9 +19,10 @@ static var TEMPLATES: Dictionary = {
 		"weight": 2.0,
 		"min_floor": 2,
 		"walls": [
-			# Horizontal divider at y=400. Two segments with 160px gap centered at x=700.
-			{"pos": Vector2(350, 400), "size": Vector2(668, 32)},
-			{"pos": Vector2(1050, 400), "size": Vector2(668, 32)},
+			# Horizontal divider ~y=400. Two segments with 240px gap centered at x=700.
+			# Segments staggered vertically by 20px for a more natural passage feel.
+			{"pos": Vector2(338, 390), "size": Vector2(484, 32)},
+			{"pos": Vector2(1062, 410), "size": Vector2(484, 32)},
 		],
 		"stairs_up": Vector2(120, 120),
 		"zones": {

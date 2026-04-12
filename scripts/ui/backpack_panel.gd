@@ -60,7 +60,7 @@ func _on_bag_tap() -> void:
 
 func _on_touch_b() -> void:
 	if _is_open:
-		close()
+		close()  # close() already guards against same-frame-as-open
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -73,6 +73,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 var _toggle_frame: int = -1
+var _open_frame: int = -1  # Frame when open() was called — block close() on same frame
 
 func toggle() -> void:
 	# Guard against double-toggle in the same frame
@@ -87,14 +88,27 @@ func toggle() -> void:
 
 
 func open() -> void:
+	if _is_open:
+		return
 	_is_open = true
+	_open_frame = Engine.get_process_frames()
 	root_control.visible = true
 	get_tree().paused = true
 	_refresh()
-	close_button.grab_focus()
+	# NOTE: Do NOT call close_button.grab_focus() here.  On mobile-web the
+	# active touch is still held when this runs; grabbing focus onto the
+	# Close button causes Godot to route the subsequent touch-release into
+	# the button, firing its "pressed" signal and immediately closing the
+	# panel.  Desktop users can still click/tap Close normally.
 
 
 func close() -> void:
+	if not _is_open:
+		return
+	# Block close on the exact same frame as open — prevents open-then-close
+	# from a single input event rippling through multiple handlers.
+	if Engine.get_process_frames() == _open_frame:
+		return
 	_is_open = false
 	_close_inspect_popup()
 	root_control.visible = false
