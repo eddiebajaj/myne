@@ -46,8 +46,12 @@ func _respawn_follower_bots() -> void:
 func _respawn_permanent_bots() -> void:
 	## Permanent bots persist across floors via Inventory.run_party.
 	## Re-create them near the player on each new floor. Skip knocked-out bots.
+	## Skip bots that are currently merged (absorbed by player).
 	for entry in Inventory.run_party:
 		if entry.get("knocked_out", false):
+			continue
+		# If merge is active, skip the merged bot (it's absorbed by the player)
+		if GameManager.merge_active and entry.get("id", "") == "scout":
 			continue
 		var spawn_offset := Vector2(randf_range(-50, 50), randf_range(-50, 50))
 		var spawn_pos := player.position + spawn_offset

@@ -13,6 +13,7 @@ extends Control
 @onready var build_panel: PanelContainer = %BuildPanel
 @onready var build_list: VBoxContainer = %BuildList
 @onready var backpack_container: PanelContainer = %BackpackContainer
+@onready var merge_panel: PanelContainer = %MergePanel
 
 var bot_placer: BotPlacer = null
 var build_step: int = 0  # 0=closed, 1=pick bot, 2=pick ore
@@ -21,6 +22,18 @@ var cancel_placement_btn: Button = null
 var _touch_b_handled_frame: int = -1  # Frame guard: signal already toggled build menu
 
 # ── Backpack state (fully owned by mining_hud, no autoload needed) ──
+# ── Merge state ──
+var _merge_active: bool = false
+var _merge_type: String = ""
+var _merge_timer: float = 0.0
+var _merge_panel_open: bool = false
+var _merge_list: VBoxContainer = null
+var _merge_timer_bar: ProgressBar = null
+var _merge_timer_label: Label = null
+var _merge_timer_max: float = 15.0
+var _player_ref: Player = null
+var _touch_x_handled_frame: int = -1
+
 var _backpack_open: bool = false
 var _bp_grid: GridContainer = null
 var _bp_capacity_label: Label = null
@@ -51,10 +64,16 @@ func _ready() -> void:
 	if touch:
 		touch.action_b_pressed.connect(_on_touch_b)
 		touch.action_y_pressed.connect(_on_touch_y)
+		touch.action_x_pressed.connect(_on_touch_x)
 	_build_backpack_ui()
+	_build_merge_panel_ui()
+	_build_merge_timer_ui()
 	_update_backpack()
 	_update_extras()
 	_on_floor_changed(GameManager.current_floor)
+	# Restore merge state if persisted across floor transition
+	if GameManager.merge_active:
+		_restore_merge_from_gm()
 
 
 # ── Bot placer / Cancel button ──────────────────────────────────────
@@ -107,6 +126,7 @@ func _hide_cancel_button() -> void:
 
 
 func set_player(player: Player) -> void:
+	_player_ref = player
 	player.health_changed.connect(_on_health_changed)
 	_on_health_changed(player.health, player.max_health, player.armor, player.max_armor)
 
@@ -115,6 +135,9 @@ func set_player(player: Player) -> void:
 
 func _on_touch_b() -> void:
 	_touch_b_handled_frame = Engine.get_process_frames()
+	if _merge_panel_open:
+		_close_merge_panel()
+		return
 	if _backpack_open:
 		_close_backpack()
 		return
@@ -123,10 +146,30 @@ func _on_touch_b() -> void:
 	if build_panel.visible:
 		_close_build_menu()
 	else:
+		if _merge_active:
+			return  # Can't open build menu while merged
 		_open_build_step1()
 
 
+func _on_touch_x() -> void:
+	_touch_x_handled_frame = Engine.get_process_frames()
+	if _merge_panel_open:
+		_close_merge_panel()
+		return
+	if _merge_active:
+		return  # Already merged, X does nothing
+	if _backpack_open or build_panel.visible:
+		return  # Other panels open
+	if bot_placer and bot_placer.placing:
+		return
+	_open_merge_panel()
+
+
 func _on_touch_y() -> void:
+	# Close merge panel if open (mutual exclusion)
+	if _merge_panel_open:
+		_close_merge_panel()
+		return
 	# Close build menu first if it's open (mutual exclusion)
 	if build_panel.visible:
 		_close_build_menu()
@@ -150,27 +193,52 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			_open_backpack()
 		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("ui_cancel") and _merge_panel_open:
+		_close_merge_panel()
+		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_cancel") and _backpack_open:
 		_close_backpack()
 		get_viewport().set_input_as_handled()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	# --- Merge timer ---
+	if _merge_active:
+		_merge_timer -= delta
+		_update_merge_timer_display()
+		if _merge_timer <= 0:
+			_end_merge()
+		# Persist to GameManager for floor transitions
+		GameManager.merge_time_remaining = _merge_timer
+
+	# --- X button: merge panel toggle (keyboard fallback) ---
+	if Input.is_action_just_pressed("action_x"):
+		if _touch_x_handled_frame != Engine.get_process_frames():
+			if _merge_panel_open:
+				_close_merge_panel()
+			elif not _merge_active and not _backpack_open and not build_panel.visible:
+				if not (bot_placer and bot_placer.placing):
+					_open_merge_panel()
+
 	# --- B button: build menu toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
 		if _touch_b_handled_frame != Engine.get_process_frames():
-			if _backpack_open:
+			if _merge_panel_open:
+				_close_merge_panel()
+			elif _backpack_open:
 				_close_backpack()
 			elif bot_placer and bot_placer.placing:
 				pass
 			elif build_panel.visible:
 				_close_build_menu()
-			else:
+			elif not _merge_active:
 				_open_build_step1()
 
 	# --- Y button: backpack toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_y"):
-		if build_panel.visible:
+		if _merge_panel_open:
+			_close_merge_panel()
+		elif build_panel.visible:
 			_close_build_menu()
 		elif _backpack_open:
 			_close_backpack()
@@ -274,6 +342,7 @@ func _build_backpack_ui() -> void:
 func _open_backpack() -> void:
 	if _backpack_open:
 		return
+	_close_merge_panel()
 	_backpack_open = true
 	backpack_container.visible = true
 	get_tree().paused = true
@@ -590,7 +659,10 @@ func _refresh_bp_side() -> void:
 # ── Build menu ──────────────────────────────────────────────────────
 
 func _open_build_step1() -> void:
+	if _merge_active:
+		return  # Can't open build menu while merged
 	_close_backpack()
+	_close_merge_panel()
 	build_step = 1
 	selected_bot = null
 	build_panel.visible = true
@@ -677,6 +749,267 @@ func _rebuild_ore_list() -> void:
 	back.text = "← Back"
 	back.pressed.connect(func(): _open_build_step1())
 	build_list.add_child(back)
+
+
+# ── Merge panel ─────────────────────────────────────────────────────
+
+func _build_merge_panel_ui() -> void:
+	merge_panel.process_mode = Node.PROCESS_MODE_ALWAYS
+	merge_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.12, 0.16, 0.96)
+	style.border_color = Color(0.3, 0.9, 1.0, 1.0)
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	merge_panel.add_theme_stylebox_override("panel", style)
+
+	_merge_list = VBoxContainer.new()
+	_merge_list.add_theme_constant_override("separation", 6)
+	merge_panel.add_child(_merge_list)
+
+
+func _build_merge_timer_ui() -> void:
+	## Merge timer bar — thin bar below the HP bar area, hidden by default.
+	_merge_timer_bar = ProgressBar.new()
+	_merge_timer_bar.name = "MergeTimerBar"
+	_merge_timer_bar.layout_mode = 1
+	_merge_timer_bar.anchors_preset = 0
+	_merge_timer_bar.offset_left = 10
+	_merge_timer_bar.offset_top = 70
+	_merge_timer_bar.offset_right = 180
+	_merge_timer_bar.offset_bottom = 82
+	_merge_timer_bar.show_percentage = false
+	_merge_timer_bar.visible = false
+	# Cyan color via stylebox
+	var fill_style := StyleBoxFlat.new()
+	fill_style.bg_color = Color(0.3, 0.9, 1.0, 0.9)
+	_merge_timer_bar.add_theme_stylebox_override("fill", fill_style)
+	var bg_style := StyleBoxFlat.new()
+	bg_style.bg_color = Color(0.15, 0.15, 0.2, 0.8)
+	_merge_timer_bar.add_theme_stylebox_override("background", bg_style)
+	add_child(_merge_timer_bar)
+
+	_merge_timer_label = Label.new()
+	_merge_timer_label.name = "MergeTimerLabel"
+	_merge_timer_label.layout_mode = 1
+	_merge_timer_label.anchors_preset = 0
+	_merge_timer_label.offset_left = 10
+	_merge_timer_label.offset_top = 70
+	_merge_timer_label.offset_right = 180
+	_merge_timer_label.offset_bottom = 82
+	_merge_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_merge_timer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_merge_timer_label.add_theme_font_size_override("font_size", 10)
+	_merge_timer_label.visible = false
+	_merge_timer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_merge_timer_label)
+
+
+func _populate_merge_list() -> void:
+	for child in _merge_list.get_children():
+		child.queue_free()
+
+	var title := Label.new()
+	title.text = "MERGE WITH SCOUT"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 18)
+	_merge_list.add_child(title)
+
+	var sep1 := Control.new()
+	sep1.custom_minimum_size = Vector2(0, 4)
+	_merge_list.add_child(sep1)
+
+	# Upper Body button
+	var upper_btn := Button.new()
+	upper_btn.text = "Upper Body — Crystal Shots\nRapid-fire, +8 damage, 180px range\nDuration: %.0fs | Cost: 1 battery" % _get_merge_duration()
+	upper_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	upper_btn.custom_minimum_size = Vector2(0, 70)
+	upper_btn.pressed.connect(func(): _execute_merge("upper"))
+	_merge_list.add_child(upper_btn)
+
+	# Lower Body button
+	var lower_btn := Button.new()
+	lower_btn.text = "Lower Body — Crystal Dash\n350 speed, +5 armor, doubled dodge\nDuration: %.0fs | Cost: 1 battery" % _get_merge_duration()
+	lower_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	lower_btn.custom_minimum_size = Vector2(0, 70)
+	lower_btn.pressed.connect(func(): _execute_merge("lower"))
+	_merge_list.add_child(lower_btn)
+
+	var sep2 := Control.new()
+	sep2.custom_minimum_size = Vector2(0, 4)
+	_merge_list.add_child(sep2)
+
+	# Cancel button
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.pressed.connect(_close_merge_panel)
+	_merge_list.add_child(cancel_btn)
+
+
+func _open_merge_panel() -> void:
+	if _merge_panel_open or _merge_active:
+		return
+	_close_backpack()
+	_close_build_menu()
+	_merge_panel_open = true
+	merge_panel.visible = true
+	get_tree().paused = true
+	_populate_merge_list()
+
+
+func _close_merge_panel() -> void:
+	if not _merge_panel_open:
+		return
+	_merge_panel_open = false
+	merge_panel.visible = false
+	get_tree().paused = false
+
+
+func _get_merge_duration() -> float:
+	# TODO: battery tier selection when multiple tiers exist
+	return 15.0
+
+
+func _execute_merge(type: String) -> void:
+	_close_merge_panel()
+
+	# Check: Scout alive + batteries > 0
+	var scout_alive := false
+	for entry in Inventory.run_party:
+		if entry.get("id", "") == "scout" and not entry.get("knocked_out", false):
+			scout_alive = true
+			break
+
+	if not scout_alive:
+		_show_merge_warning("Scout is knocked out!")
+		return
+	if Inventory.batteries <= 0:
+		_show_merge_warning("No batteries!")
+		return
+
+	# Consume 1 battery
+	Inventory.use_battery()
+	_update_extras()
+
+	# Find and remove Scout from the floor
+	var floor_root := get_tree().current_scene
+	if floor_root:
+		for bot in get_tree().get_nodes_in_group("permanent_bots"):
+			if bot is PermanentBot and bot.bot_id == "scout":
+				bot.queue_free()
+				break
+
+	# Apply merge stats to player
+	if _player_ref and is_instance_valid(_player_ref):
+		_player_ref.apply_merge(type)
+
+	# Start merge timer
+	_merge_type = type
+	_merge_timer_max = _get_merge_duration()
+	_merge_timer = _merge_timer_max
+	_merge_active = true
+
+	# Show timer bar
+	_merge_timer_bar.visible = true
+	_merge_timer_bar.max_value = _merge_timer_max
+	_merge_timer_bar.value = _merge_timer
+	_merge_timer_label.visible = true
+
+	# Persist to GameManager
+	GameManager.merge_active = true
+	GameManager.merge_type = type
+	GameManager.merge_time_remaining = _merge_timer
+
+
+func _end_merge() -> void:
+	_merge_active = false
+	_merge_timer = 0.0
+
+	# Revert player stats
+	if _player_ref and is_instance_valid(_player_ref):
+		_player_ref.revert_merge()
+
+	# Respawn Scout near player
+	_respawn_scout_after_merge()
+
+	# Hide timer bar
+	_merge_timer_bar.visible = false
+	_merge_timer_label.visible = false
+
+	# Clear GameManager state
+	GameManager.merge_active = false
+	GameManager.merge_type = ""
+	GameManager.merge_time_remaining = 0.0
+
+	_merge_type = ""
+
+
+func _respawn_scout_after_merge() -> void:
+	## Respawn the Scout near the player after merge expires.
+	var floor_controller = get_tree().current_scene
+	if floor_controller == null or not floor_controller.has_method("_spawn_permanent_bot"):
+		# Fallback: can't respawn if no floor controller
+		return
+	# Find scout in run_party
+	for entry in Inventory.run_party:
+		if entry.get("id", "") == "scout":
+			entry["knocked_out"] = false  # Ensure not knocked out
+			var spawn_pos := Vector2.ZERO
+			if _player_ref and is_instance_valid(_player_ref):
+				spawn_pos = _player_ref.global_position + Vector2(randf_range(-40, 40), randf_range(-40, 40))
+			floor_controller._spawn_permanent_bot(entry, spawn_pos)
+			break
+
+
+func _update_merge_timer_display() -> void:
+	if not _merge_active:
+		return
+	_merge_timer_bar.value = maxf(_merge_timer, 0.0)
+	_merge_timer_label.text = "MERGE: %.1fs" % maxf(_merge_timer, 0.0)
+	# Flash when < 3s remaining
+	if _merge_timer < 3.0:
+		var flash := fmod(Time.get_ticks_msec() / 1000.0, 0.4)
+		_merge_timer_bar.modulate.a = 0.5 if flash < 0.2 else 1.0
+		_merge_timer_label.modulate.a = _merge_timer_bar.modulate.a
+	else:
+		_merge_timer_bar.modulate.a = 1.0
+		_merge_timer_label.modulate.a = 1.0
+
+
+func _show_merge_warning(text: String) -> void:
+	if full_warning:
+		full_warning.text = text
+		full_warning.visible = true
+		var tween := create_tween()
+		tween.tween_property(full_warning, "modulate:a", 1.0, 0.0)
+		tween.tween_interval(1.5)
+		tween.tween_property(full_warning, "modulate:a", 0.0, 0.5)
+		tween.tween_callback(func():
+			full_warning.visible = false
+			full_warning.modulate.a = 1.0
+		)
+
+
+func _restore_merge_from_gm() -> void:
+	## Called on floor load if GameManager says merge was active.
+	## Reapply merge to the new player node and resume the timer.
+	if _player_ref and is_instance_valid(_player_ref):
+		_player_ref.apply_merge(GameManager.merge_type)
+	_merge_type = GameManager.merge_type
+	_merge_timer_max = _get_merge_duration()
+	_merge_timer = GameManager.merge_time_remaining
+	_merge_active = true
+	_merge_timer_bar.visible = true
+	_merge_timer_bar.max_value = _merge_timer_max
+	_merge_timer_bar.value = _merge_timer
+	_merge_timer_label.visible = true
 
 
 # ── HUD updates ─────────────────────────────────────────────────────

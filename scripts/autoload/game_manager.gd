@@ -27,6 +27,11 @@ var run_max_health: float = DEFAULT_MAX_HEALTH
 var run_armor: float = 0.0
 var run_max_armor: float = 0.0
 
+# --- Merge persistence across floor transitions ---
+var merge_active: bool = false
+var merge_type: String = ""
+var merge_time_remaining: float = 0.0
+
 const CHECKPOINT_INTERVAL := 5
 const MAX_FLOOR := 20
 
@@ -93,6 +98,7 @@ func return_to_town() -> void:
 	if current_state != GameState.MINING:
 		return
 	current_state = GameState.TRANSITIONING
+	_clear_merge_state()
 	Inventory.end_run(false)
 	Inventory.restore_permanent_bots()
 	get_tree().change_scene_to_file("res://scenes/town/town.tscn")
@@ -104,6 +110,7 @@ func die() -> void:
 	if current_state != GameState.MINING:
 		return
 	current_state = GameState.TRANSITIONING
+	_clear_merge_state()
 	player_died.emit()
 	Inventory.end_run(true)
 	Inventory.restore_permanent_bots()
@@ -160,3 +167,9 @@ func set_run_max_armor(value: float) -> void:
 	## Used by cave equipment loot that bumps the armor cap mid-run.
 	run_max_armor = maxf(run_max_armor, value)
 	run_armor = run_max_armor
+
+
+func _clear_merge_state() -> void:
+	merge_active = false
+	merge_type = ""
+	merge_time_remaining = 0.0

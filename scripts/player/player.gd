@@ -24,6 +24,11 @@ var is_invulnerable: bool = false
 var _last_popup_time: float = -1.0
 var _popup_stagger_index: int = 0
 
+# --- Merge state ---
+var merged: bool = false
+var merge_type: String = ""  # "upper" or "lower"
+var _pre_merge_stats: Dictionary = {}  # Store originals to revert
+
 @onready var swing_timer: Timer = $SwingTimer
 @onready var pickaxe_area: Area2D = $PickaxeArea
 @onready var body_sprite: ColorRect = $BodySprite
@@ -89,7 +94,10 @@ func _physics_process(_delta: float) -> void:
 			facing_dir = Vector2(signf(input_dir.x), 0.0)
 		else:
 			facing_dir = Vector2(0.0, signf(input_dir.y))
-	velocity = input_dir.normalized() * MOVE_SPEED
+	var current_speed := MOVE_SPEED
+	if merged and merge_type == "lower":
+		current_speed = 350.0
+	velocity = input_dir.normalized() * current_speed
 	move_and_slide()
 	_update_pickaxe_position()
 	_update_facing_visuals()
@@ -101,6 +109,10 @@ func _physics_process(_delta: float) -> void:
 
 func swing_pickaxe() -> void:
 	can_swing = false
+	if merged and merge_type == "upper":
+		swing_timer.wait_time = 0.12
+	else:
+		swing_timer.wait_time = BASE_SWING_COOLDOWN
 	swing_timer.start()
 	# Bug fix (sprint 2): the previous code rotated the ColorRect around its
 	# own pivot (0,0) which, with its offset_left=30 in player.tscn, meant the
@@ -124,11 +136,12 @@ func swing_pickaxe() -> void:
 		pickaxe_sprite.rotation = 0.0
 	)
 	# Hit everything in pickaxe area
+	var merge_damage_bonus: float = 8.0 if (merged and merge_type == "upper") else 0.0
 	for body in pickaxe_area.get_overlapping_bodies():
 		if body.has_method("take_hit"):
 			body.take_hit(1)  # Ore nodes: 1 hit per swing regardless of tier (tier affects total hits needed)
 		if body.has_method("take_damage"):
-			body.take_damage(BASE_PICKAXE_DAMAGE + pickaxe_tier, DamageType.PHYSICAL)
+			body.take_damage(BASE_PICKAXE_DAMAGE + pickaxe_tier + merge_damage_bonus, DamageType.PHYSICAL)
 
 
 func take_damage(amount: float, damage_type: int = DamageType.PHYSICAL) -> void:
@@ -182,7 +195,10 @@ func _die() -> void:
 
 
 func _update_pickaxe_position() -> void:
-	pickaxe_area.position = facing_dir * PICKAXE_RANGE
+	var current_range := PICKAXE_RANGE
+	if merged and merge_type == "upper":
+		current_range = 180.0
+	pickaxe_area.position = facing_dir * current_range
 	pickaxe_area.rotation = facing_dir.angle()
 
 
@@ -240,6 +256,80 @@ func _spawn_damage_number(amount: float, color: Color) -> void:
 	tween.tween_property(label, "position:y", start_offset.y - 30.0, 0.6)
 	tween.tween_property(label, "modulate:a", 0.0, 0.6)
 	tween.chain().tween_callback(func(): label.queue_free())
+
+
+func apply_merge(type: String) -> void:
+	merged = true
+	merge_type = type
+	_pre_merge_stats = {
+		"invuln_duration": invuln_timer.wait_time,
+		"max_armor": max_armor,
+		"armor": armor,
+	}
+	match type:
+		"upper":
+			# Crystal rapid-fire: +8 damage, 3x attack speed, 180px range
+			# Handled dynamically in swing_pickaxe and _update_pickaxe_position
+			pass
+		"lower":
+			# Crystal dash: 350 speed, +5 armor, doubled i-frames
+			max_armor += 5
+			armor += 5
+			invuln_timer.wait_time = 1.0
+	# Visual: turn cyan, grow
+	if body_sprite:
+		body_sprite.color = Color(0.3, 0.9, 1.0)
+		body_sprite.size = Vector2(36, 36)
+		body_sprite.position = Vector2(-18, -18)
+	_sync_vitals_to_gm()
+	health_changed.emit(health, max_health, armor, max_armor)
+	# Burst effect: 8 cyan rects fly outward
+	_spawn_merge_burst(false)
+
+
+func revert_merge() -> void:
+	merged = false
+	if body_sprite:
+		body_sprite.color = Color(0.9, 0.85, 0.7)  # original player color
+		body_sprite.size = Vector2(24, 24)
+		body_sprite.position = Vector2(-12, -12)
+	match merge_type:
+		"lower":
+			max_armor = _pre_merge_stats.get("max_armor", max_armor - 5)
+			armor = minf(armor, max_armor)
+			invuln_timer.wait_time = _pre_merge_stats.get("invuln_duration", 0.5)
+	merge_type = ""
+	_pre_merge_stats.clear()
+	swing_timer.wait_time = BASE_SWING_COOLDOWN
+	_sync_vitals_to_gm()
+	health_changed.emit(health, max_health, armor, max_armor)
+	# Burst effect: 8 cyan rects fly inward
+	_spawn_merge_burst(true)
+
+
+func _spawn_merge_burst(inward: bool) -> void:
+	## Spawn 8 small cyan ColorRects that burst outward (or inward on unmerge).
+	for i in range(8):
+		var angle := float(i) * TAU / 8.0
+		var direction := Vector2.from_angle(angle)
+		var particle := ColorRect.new()
+		particle.size = Vector2(6, 6)
+		particle.color = Color(0.3, 0.9, 1.0, 1.0)
+		particle.z_index = 20
+		particle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(particle)
+		if inward:
+			particle.position = direction * 40.0 - Vector2(3, 3)
+			var tween := create_tween().set_parallel(true)
+			tween.tween_property(particle, "position", Vector2(-3, -3), 0.3)
+			tween.tween_property(particle, "modulate:a", 0.0, 0.3)
+			tween.chain().tween_callback(func(): particle.queue_free())
+		else:
+			particle.position = Vector2(-3, -3)
+			var tween := create_tween().set_parallel(true)
+			tween.tween_property(particle, "position", direction * 40.0 - Vector2(3, 3), 0.3)
+			tween.tween_property(particle, "modulate:a", 0.0, 0.3)
+			tween.chain().tween_callback(func(): particle.queue_free())
 
 
 func _apply_upgrades() -> void:

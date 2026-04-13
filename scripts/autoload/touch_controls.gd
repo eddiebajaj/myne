@@ -28,6 +28,7 @@ var joystick_dir: Vector2 = Vector2.ZERO
 signal action_a_pressed
 signal action_b_pressed
 signal action_y_pressed
+signal action_x_pressed
 var _action_press_frame: Dictionary = {}  # action_name -> last frame pressed (debounce)
 var _joy_touch_index: int = -1
 var _joy_center: Vector2 = Vector2.ZERO
@@ -192,13 +193,21 @@ func _build_action_buttons(parent: Control) -> void:
 	var btn_b := _create_action_button("B", b_pos, BTN_B_SIZE, "action_b")
 	parent.add_child(btn_b)
 
-	# Y button — above A (console diamond: Y top, B left, A right)
+	# Y button — above A (console diamond: Y top, B left, A right, X bottom)
 	var y_pos := Vector2(
 		a_pos.x + (BTN_A_SIZE - BTN_B_SIZE) * 0.5,  # horizontally centered with A
 		a_pos.y - BTN_B_SIZE - 15.0
 	)
 	var btn_y := _create_action_button("Y", y_pos, BTN_B_SIZE, "action_y")
 	parent.add_child(btn_y)
+
+	# X button — below A (console diamond: Y top, B left, A right, X bottom)
+	var x_pos := Vector2(
+		a_pos.x + (BTN_A_SIZE - BTN_B_SIZE) * 0.5,  # horizontally centered with A
+		a_pos.y + BTN_A_SIZE + 15.0
+	)
+	var btn_x := _create_action_button("X", x_pos, BTN_B_SIZE, "action_x")
+	parent.add_child(btn_x)
 
 
 func _create_action_button(text: String, pos: Vector2, btn_size: int, action_name: String) -> Panel:
@@ -281,6 +290,8 @@ func _press_action(action_name: String, panel: Panel) -> void:
 		action_b_pressed.emit()
 	elif action_name == "action_y":
 		action_y_pressed.emit()
+	elif action_name == "action_x":
+		action_x_pressed.emit()
 
 
 func _release_action(action_name: String, panel: Panel) -> void:
