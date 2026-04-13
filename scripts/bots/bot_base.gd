@@ -91,7 +91,11 @@ func _deal_damage_to(target_node: Node2D) -> void:
 	var dmg_type: int = 0  # PHYSICAL
 	if mineral and mineral.type == MineralData.MineralType.VENOM:
 		dmg_type = 1  # VENOM — bypasses armor
-	target_node.take_damage(damage, dmg_type)
+	# Pass source_type so enemies know damage came from a bot (for damage number color)
+	if target_node is EnemyBase:
+		target_node.take_damage(damage, dmg_type, "bot")
+	else:
+		target_node.take_damage(damage, dmg_type)
 	# Apply mineral on-hit effects
 	if mineral:
 		_apply_mineral_on_hit(target_node)
@@ -126,7 +130,7 @@ func _chain_damage(origin: Node2D, chain_dmg: float) -> void:
 			continue
 		if node is Node2D and origin.global_position.distance_to(node.global_position) < chain_range:
 			if node.has_method("take_damage"):
-				node.take_damage(chain_dmg)
+				node.take_damage(chain_dmg, 0, "bot")
 			break  # Chain to one extra target
 
 
@@ -141,6 +145,8 @@ func take_damage(amount: float, _damage_type: int = 0) -> void:
 		if mineral:
 			base_color = base_color.lerp(mineral.color, 0.3)
 		tween.tween_property(sprite, "color", base_color, 0.2)
+	# Floating damage number (orange — bot taking damage)
+	_spawn_damage_number(amount, Color(1.0, 0.6, 0.0))
 	if health <= 0:
 		_destroy()
 
@@ -167,3 +173,56 @@ func _get_nearest_in_group(group_name: String, max_range: float) -> Node2D:
 				nearest_dist = dist
 				nearest = node
 	return nearest
+
+
+func _spawn_damage_number(amount: float, color: Color) -> void:
+	var label := Label.new()
+	label.text = str(int(amount))
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	label.add_theme_constant_override("outline_size", 2)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 20
+	var start_offset := Vector2(-8.0, -28.0)
+	label.position = start_offset
+	label.modulate = Color(1, 1, 1, 1)
+	add_child(label)
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(label, "position:y", start_offset.y - 30.0, 0.6)
+	tween.tween_property(label, "modulate:a", 0.0, 0.6)
+	tween.chain().tween_callback(func(): label.queue_free())
+
+
+func _fire_projectile_at(target_node: Node2D, projectile_color: Color) -> void:
+	## Spawn a small colored rect that tweens from this bot to the target, then deals damage.
+	var projectile := ColorRect.new()
+	projectile.size = Vector2(6, 6)
+	projectile.color = projectile_color
+	projectile.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	projectile.z_index = 15
+	# Add to parent (the floor scene) so position is in world space
+	get_parent().add_child(projectile)
+	projectile.global_position = global_position - Vector2(3, 3)  # center the 6x6 rect
+	var target_pos := target_node.global_position - Vector2(3, 3)
+	var dist := global_position.distance_to(target_node.global_position)
+	var travel_time := dist / 600.0  # ~600 px/s
+	var tween := projectile.create_tween()
+	tween.tween_property(projectile, "global_position", target_pos, travel_time)
+	# Capture references for the callback
+	var dmg := damage
+	var dmg_type: int = 0
+	if mineral and mineral.type == MineralData.MineralType.VENOM:
+		dmg_type = 1
+	var has_mineral := mineral != null
+	var bot_ref := self  # for mineral on-hit
+	tween.tween_callback(func():
+		if is_instance_valid(target_node) and target_node.has_method("take_damage"):
+			if target_node is EnemyBase:
+				target_node.take_damage(dmg, dmg_type, "bot")
+			else:
+				target_node.take_damage(dmg, dmg_type)
+			if has_mineral and is_instance_valid(bot_ref):
+				bot_ref._apply_mineral_on_hit(target_node)
+		projectile.queue_free()
+	)

@@ -142,6 +142,23 @@ func take_damage(amount: float, damage_type: int = DamageType.PHYSICAL) -> void:
 		remaining -= absorbed
 	if remaining > 0:
 		health -= remaining
+	# White flash before invuln alpha change
+	if body_sprite:
+		var original_color: Color = body_sprite.color
+		body_sprite.color = Color.WHITE
+		var flash_tween := create_tween()
+		flash_tween.tween_property(body_sprite, "color", original_color, 0.1)
+	# Camera shake
+	var cam := get_node_or_null("Camera2D") as Camera2D
+	if cam:
+		var shake_tween := create_tween()
+		shake_tween.tween_property(cam, "offset", Vector2(randf_range(-2, 2), randf_range(-2, 2)), 0.03)
+		shake_tween.tween_property(cam, "offset", Vector2(randf_range(-2, 2), randf_range(-2, 2)), 0.03)
+		shake_tween.tween_property(cam, "offset", Vector2(randf_range(-2, 2), randf_range(-2, 2)), 0.03)
+		shake_tween.tween_property(cam, "offset", Vector2(randf_range(-2, 2), randf_range(-2, 2)), 0.03)
+		shake_tween.tween_property(cam, "offset", Vector2.ZERO, 0.03)
+	# Floating damage number (red)
+	_spawn_damage_number(amount, Color.RED)
 	is_invulnerable = true
 	invuln_timer.start()
 	modulate.a = 0.5
@@ -201,6 +218,25 @@ func show_pickup_popup(text: String) -> void:
 	label.modulate = Color(1, 1, 1, 1)
 	add_child(label)
 	var tween: Tween = create_tween().set_parallel(true)
+	tween.tween_property(label, "position:y", start_offset.y - 30.0, 0.6)
+	tween.tween_property(label, "modulate:a", 0.0, 0.6)
+	tween.chain().tween_callback(func(): label.queue_free())
+
+
+func _spawn_damage_number(amount: float, color: Color) -> void:
+	var label := Label.new()
+	label.text = str(int(amount))
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	label.add_theme_constant_override("outline_size", 2)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 20
+	var start_offset := Vector2(-8.0, -28.0)
+	label.position = start_offset
+	label.modulate = Color(1, 1, 1, 1)
+	add_child(label)
+	var tween := create_tween().set_parallel(true)
 	tween.tween_property(label, "position:y", start_offset.y - 30.0, 0.6)
 	tween.tween_property(label, "modulate:a", 0.0, 0.6)
 	tween.chain().tween_callback(func(): label.queue_free())

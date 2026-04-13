@@ -26,7 +26,9 @@ func _find_target() -> void:
 func _act(_delta: float) -> void:
 	if attack_timer <= 0 and target and is_instance_valid(target):
 		attack_timer = 1.0 / attack_speed
-		_deal_damage_to(target)
+		# Fire a red projectile instead of instant damage
+		_fire_projectile_at(target, Color.RED)
+		# Visual flash on the drone itself
 		if sprite:
 			var base_color := sprite.color
 			var tween := create_tween()

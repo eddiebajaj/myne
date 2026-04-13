@@ -165,13 +165,21 @@ func _attack() -> void:
 	attack_timer = 1.0 / data.attack_speed
 	if target and target.has_method("take_damage"):
 		target.take_damage(data.damage, data.damage_type)
+	# Attack flash: red tint on sprite
 	if sprite:
-		var tween := create_tween()
-		sprite.color = Color.WHITE
-		tween.tween_property(sprite, "color", data.color if data else Color.RED, 0.15)
+		var flash_tween := create_tween()
+		sprite.modulate = Color.RED
+		flash_tween.tween_property(sprite, "modulate", Color.WHITE, 0.1)
+	# Lunge: move 8px toward target then snap back
+	if target and is_instance_valid(target):
+		var lunge_dir := global_position.direction_to(target.global_position)
+		var original_pos := global_position
+		var lunge_tween := create_tween()
+		lunge_tween.tween_property(self, "global_position", original_pos + lunge_dir * 8.0, 0.05)
+		lunge_tween.tween_property(self, "global_position", original_pos, 0.10)
 
 
-func take_damage(amount: float, _damage_type: int = 0) -> void:
+func take_damage(amount: float, _damage_type: int = 0, source_type: String = "player") -> void:
 	# Any damage flips passive_wander enemies into aggro for the rest of their life.
 	has_been_provoked = true
 	health -= amount
@@ -181,6 +189,14 @@ func take_damage(amount: float, _damage_type: int = 0) -> void:
 		var tween := create_tween()
 		sprite.color = Color.WHITE
 		tween.tween_property(sprite, "color", data.color if data else Color.RED, 0.1)
+	# Floating damage number
+	var dmg_color: Color
+	match source_type:
+		"bot":
+			dmg_color = Color.YELLOW
+		_:
+			dmg_color = Color.WHITE
+	_spawn_damage_number(amount, dmg_color)
 	if health <= 0:
 		_on_death()
 
@@ -233,3 +249,22 @@ func _process_status_effects(delta: float) -> void:
 		if health <= 0:
 			_on_death()
 			return
+
+
+func _spawn_damage_number(amount: float, color: Color) -> void:
+	var label := Label.new()
+	label.text = str(int(amount))
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 1))
+	label.add_theme_constant_override("outline_size", 2)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.z_index = 20
+	var start_offset := Vector2(-8.0, -28.0)
+	label.position = start_offset
+	label.modulate = Color(1, 1, 1, 1)
+	add_child(label)
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(label, "position:y", start_offset.y - 30.0, 0.6)
+	tween.tween_property(label, "modulate:a", 0.0, 0.6)
+	tween.chain().tween_callback(func(): label.queue_free())
