@@ -196,11 +196,49 @@ Currently only T1 batteries exist, so 15s is the practical duration.
 - Second permanent bot (Guardian) — Sprint 5
 - T2 balance / content — deferred until merge is fun
 - Save system — deferred until mechanics are fun
-- Art / sprites — deferred
-- Merge transformation animation sequence — simple color shift for now
+- Full sprite art pass — Sprint 5 (style decided: pixel art 32x32, Binding of Isaac reference)
+- Merge transformation animation sequence — simple color shift + particle burst for now
 - Party selection UI (only 1 bot, auto-selected)
 - Bot upgrades at Lab
 - Story/narrative beyond the unlock popup
+
+---
+
+## Pillar C — Combat Readability
+
+Code-driven visual feedback. No sprite assets — just tweens, particles, and colored shapes. Makes combat readable instead of invisible.
+
+### C1. Enemy attack visual
+- When an enemy deals damage: flash the enemy sprite **red** for 0.1s + brief lunge toward target (tween position 8px toward player, snap back)
+- Makes it clear WHEN and WHO is hitting you
+
+### C2. Bot/turret projectile
+- When a turret or drone attacks: spawn a small colored circle (6px) that moves from bot to target at 600px/s
+- Color matches the bot's color (yellow for turret, red for combat drone)
+- Disappears on reaching target
+- Makes bot combat visible — you can SEE your turret working
+
+### C3. Player damage feedback
+- On taking damage: brief white flash on player sprite (0.1s) + camera shake (2px random offset for 0.15s)
+- Already has 0.5s invulnerability flash (modulate.a = 0.5) — this adds impact to the hit moment
+
+### C4. Damage numbers
+- When any entity takes damage: floating number rises and fades (same pattern as pickup popups)
+- Color-coded: white for normal, red for player damage taken, yellow for bot damage dealt
+- Shows the actual damage value — helps players understand balance
+
+### C5. Merge transformation
+- On merge: player color shifts to cyan, size increases 24→36, brief particle burst (8 small colored rects flying outward)
+- On merge expire: reverse burst, size/color revert
+- Merge timer bar on HUD pulses when <3s remaining
+
+---
+
+## Art Direction (Sprint 5 prep)
+
+**Style:** Pixel art, 32x32 tiles. Reference: Binding of Isaac (top-down, readable silhouettes, expressive with minimal pixels).
+
+**Sprint 5 target:** First sprite pass covering player, 4 enemy types, 4 disposable bots, Scout companion, ore nodes, rocks, walls, stairs. Style guide and palette decided in Sprint 4, sprites produced in Sprint 5.
 
 ---
 
@@ -224,11 +262,19 @@ Currently only T1 batteries exist, so 15s is the practical duration.
 - [ ] Can't merge when knocked out / no battery / already merged
 - [ ] Merge persists across floor transitions
 
+### Combat Readability
+- [ ] Enemies flash red + lunge when dealing damage
+- [ ] Turrets and drones fire visible projectiles at targets
+- [ ] Player flashes white + camera shakes on taking damage
+- [ ] Floating damage numbers on all combat hits
+- [ ] Merge transformation has visual burst effect + HUD timer
+
 ---
 
 ## Delivery Order
 
-1. **Pillar A first** — get Scout spawning, following, fighting
-2. **Pillar B second** — merge UI + mechanics on top of working companion
-3. **Playtest checkpoint** after each pillar
-4. **Sprint review** after both verified
+1. **Pillar C first** — combat visuals (small, independent, improves feel for everything after)
+2. **Pillar A second** — Scout companion spawning, following, fighting
+3. **Pillar B third** — merge UI + mechanics on top of working companion
+4. **Playtest checkpoint** after each pillar
+5. **Sprint review** after all verified
