@@ -98,7 +98,7 @@ func _on_touch_b() -> void:
 	# Close backpack if open — B always dismisses backpack first
 	var bp = get_node_or_null("/root/BackpackPanel")
 	if bp and bp._is_open:
-		bp.close()
+		_close_backpack_direct()
 		_touch_b_handled_frame = Engine.get_process_frames()
 		return
 	if bot_placer and bot_placer.placing:
@@ -128,7 +128,7 @@ func _process(_delta: float) -> void:
 		# Close backpack if open — B always dismisses backpack first
 		var bp_b = get_node_or_null("/root/BackpackPanel")
 		if bp_b and bp_b._is_open:
-			bp_b.close()
+			_close_backpack_direct()
 			return
 		# Don't toggle menu while bot_placer is in placement mode — it handles its own cancel
 		if bot_placer and bot_placer.placing:
@@ -150,27 +150,185 @@ func _process(_delta: float) -> void:
 
 
 func _toggle_backpack_direct() -> void:
-	## Toggle BackpackPanel via its own open/close methods.
-	## The @onready null issue is fixed — BackpackPanel resolves nodes in _ready
-	## via get_node_or_null, so open()/close()/_refresh() all work correctly.
+	## Toggle BackpackPanel entirely from mining_hud, bypassing all bp methods.
+	## BackpackPanel's @onready / _ready node refs are null, so we fetch every
+	## child dynamically via get_node_or_null at press time.
 	var bp = get_node_or_null("/root/BackpackPanel")
 	if bp == null:
 		return
+	var root = bp.get_node_or_null("Root")
+	if root == null:
+		return
 	if bp._is_open:
-		bp.close()
+		# CLOSE
+		bp._is_open = false
+		root.visible = false
+		get_tree().paused = false
 	else:
-		bp.visible = true   # Force CanvasLayer itself visible
-		bp.layer = 99       # Force above everything except TouchControls (100)
-		bp.open()
+		# OPEN
+		bp._is_open = true
+		bp.visible = true
+		bp.layer = 99
+		root.visible = true
+		get_tree().paused = true
+		_refresh_backpack(bp)
+		# Connect close button if not already connected
+		var close_btn = bp.get_node_or_null("Root/Panel/VBox/CloseButton")
+		if close_btn and not close_btn.pressed.is_connected(_close_backpack_direct):
+			close_btn.pressed.connect(_close_backpack_direct)
+
+
+func _close_backpack_direct() -> void:
+	## Close BackpackPanel without calling any of its methods.
+	var bp = get_node_or_null("/root/BackpackPanel")
+	if bp == null or not bp._is_open:
+		return
+	bp._is_open = false
+	var root = bp.get_node_or_null("Root")
+	if root:
+		root.visible = false
+	get_tree().paused = false
+
+
+func _refresh_backpack(bp: Node) -> void:
+	## Replicate BackpackPanel's _refresh logic using dynamic node lookups.
+	if not bp._is_open:
+		return
+	_refresh_backpack_header(bp)
+	_refresh_backpack_grid(bp)
+	_refresh_backpack_side_panel(bp)
+
+
+func _refresh_backpack_header(bp: Node) -> void:
+	var title_lbl = bp.get_node_or_null("Root/Panel/VBox/HeaderRow/TitleLabel")
+	var cap_lbl = bp.get_node_or_null("Root/Panel/VBox/HeaderRow/CapacityLabel")
+	var used: int = Inventory.get_used_slots()
+	var cap: int = Inventory.get_max_capacity()
+	if title_lbl:
+		title_lbl.text = "BACKPACK"
+	if cap_lbl:
+		cap_lbl.text = "%d / %d" % [used, cap]
+
+
+func _refresh_backpack_grid(bp: Node) -> void:
+	var grid = bp.get_node_or_null("Root/Panel/VBox/Body/GridWrap/Grid")
+	if grid == null:
+		return
+	for child in grid.get_children():
+		child.queue_free()
+	var cap: int = Inventory.get_max_capacity()
+	var cell_size: int = 80 if _bp_is_touch_device() else 64
+	# Flatten stacks into individual cells
+	var cells: Array[Dictionary] = []
+	for slot in Inventory.get_ore_stacks():
+		var qty: int = int(slot.quantity)
+		for i in range(qty):
+			cells.append({"ore": slot.ore, "mineral": slot.mineral})
+	for i in range(cap):
+		var cell_data: Dictionary = cells[i] if i < cells.size() else {}
+		grid.add_child(_build_bp_cell(cell_data, cell_size))
+
+
+func _build_bp_cell(cell_data: Dictionary, cell_size: int) -> Control:
+	var cell: Panel = Panel.new()
+	cell.custom_minimum_size = Vector2(cell_size, cell_size)
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.border_width_top = 1
+	style.border_width_bottom = 1
+	style.border_width_left = 1
+	style.border_width_right = 1
+	style.border_color = Color(0.5, 0.5, 0.55, 1.0)
+	if cell_data.is_empty():
+		style.bg_color = Color(0.15, 0.15, 0.18, 1.0)
+	else:
+		var ore: OreData = cell_data.ore
+		style.bg_color = ore.color
+	cell.add_theme_stylebox_override("panel", style)
+	if cell_data.is_empty():
+		return cell
+	var ore_data: OreData = cell_data.ore
+	var mineral: MineralData = cell_data.mineral
+	if mineral != null:
+		var pip: ColorRect = ColorRect.new()
+		pip.color = mineral.color
+		pip.size = Vector2(16, 16)
+		pip.position = Vector2(cell_size - 20, 4)
+		pip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cell.add_child(pip)
+	cell.set_meta("ore_id", ore_data.id)
+	cell.set_meta("mineral_id", mineral.id if mineral != null else "")
+	cell.mouse_filter = Control.MOUSE_FILTER_STOP
+	# Cell tap uses BackpackPanel's inspect popup — call it directly on bp
+	cell.gui_input.connect(func(event: InputEvent):
+		var is_click: bool = event is InputEventMouseButton \
+			and (event as InputEventMouseButton).pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
+		var is_tap: bool = event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed
+		if is_click or is_tap:
+			var bp_ref = get_node_or_null("/root/BackpackPanel")
+			if bp_ref:
+				bp_ref._open_inspect_popup(
+					String(cell.get_meta("ore_id", "")),
+					String(cell.get_meta("mineral_id", ""))
+				)
+	)
+	return cell
+
+
+func _refresh_backpack_side_panel(bp: Node) -> void:
+	var gold_lbl = bp.get_node_or_null("Root/Panel/VBox/Body/SidePanel/GoldLabel")
+	var batt_lbl = bp.get_node_or_null("Root/Panel/VBox/Body/SidePanel/BatteryLabel")
+	var followers_hdr = bp.get_node_or_null("Root/Panel/VBox/Body/SidePanel/FollowersHeader")
+	var followers_lst = bp.get_node_or_null("Root/Panel/VBox/Body/SidePanel/FollowersList")
+	if gold_lbl:
+		gold_lbl.text = "Gold: %d" % GameManager.gold
+	if batt_lbl:
+		batt_lbl.text = "Batteries: %d" % Inventory.batteries
+	if followers_lst:
+		for child in followers_lst.get_children():
+			child.queue_free()
+	if followers_hdr:
+		followers_hdr.text = "FOLLOWERS"
+	if followers_lst == null:
+		return
+	if Inventory.follower_bots.is_empty():
+		var empty_lbl: Label = Label.new()
+		empty_lbl.text = "No followers"
+		empty_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
+		followers_lst.add_child(empty_lbl)
+		return
+	for bot_entry in Inventory.follower_bots:
+		var row: HBoxContainer = HBoxContainer.new()
+		var pip: ColorRect = ColorRect.new()
+		pip.custom_minimum_size = Vector2(12, 12)
+		var tier: int = int(bot_entry.get("ore_tier", 1))
+		var tier_colors: Array = [
+			Color(0.8, 0.8, 0.8),
+			Color(0.4, 0.8, 1.0),
+			Color(1.0, 0.8, 0.3),
+			Color(1.0, 0.4, 0.9),
+		]
+		pip.color = tier_colors[clampi(tier - 1, 0, 3)]
+		row.add_child(pip)
+		var name_label: Label = Label.new()
+		var bot_data: BotData = bot_entry.get("data") as BotData
+		name_label.text = "  " + (bot_data.display_name if bot_data else "Bot")
+		row.add_child(name_label)
+		followers_lst.add_child(row)
+
+
+func _bp_is_touch_device() -> bool:
+	if OS.has_feature("web"):
+		return true
+	if OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios"):
+		return true
+	return false
 
 
 func _open_build_step1() -> void:
 	## Step 1: Pick bot type. Game pauses while menu is open.
 	# Close backpack first if it's open
-	var bp = get_node_or_null("/root/BackpackPanel")
-	if bp and bp._is_open:
-		bp.close()
-		# close() unpauses, but build menu will re-pause below
+	_close_backpack_direct()
 	build_step = 1
 	selected_bot = null
 	build_panel.visible = true
