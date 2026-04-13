@@ -177,6 +177,20 @@ horizontal_alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 
+[node name="BackpackContainer" type="PanelContainer" parent="CanvasLayer/MiningHUD"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -350
+offset_top = -250
+offset_right = 350
+offset_bottom = 250
+visible = false
+
 [node name="HintLabel" type="Label" parent="CanvasLayer/MiningHUD"]
 layout_mode = 1
 anchors_preset = 6

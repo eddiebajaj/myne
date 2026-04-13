@@ -12,13 +12,33 @@ extends Control
 @onready var full_warning: Label = %FullWarning
 @onready var build_panel: PanelContainer = %BuildPanel
 @onready var build_list: VBoxContainer = %BuildList
+@onready var backpack_container: PanelContainer = %BackpackContainer
 
 var bot_placer: BotPlacer = null
 var build_step: int = 0  # 0=closed, 1=pick bot, 2=pick ore
 var selected_bot: BotData = null
 var cancel_placement_btn: Button = null
 var _touch_b_handled_frame: int = -1  # Frame guard: signal already toggled build menu
-var _touch_y_handled_frame: int = -1  # Frame guard: signal already toggled backpack
+
+# ── Backpack state (fully owned by mining_hud, no autoload needed) ──
+var _backpack_open: bool = false
+var _bp_grid: GridContainer = null
+var _bp_capacity_label: Label = null
+var _bp_gold_label: Label = null
+var _bp_battery_label: Label = null
+var _bp_followers_header: Label = null
+var _bp_followers_list: VBoxContainer = null
+
+# Inspect popup state
+var _inspect_popup: PanelContainer = null
+var _inspect_dim: ColorRect = null
+var _inspect_ore_id: String = ""
+var _inspect_mineral_id: String = ""
+
+const CELL_SIZE_DESKTOP: int = 64
+const CELL_SIZE_MOBILE: int = 80
+const GRID_COLS: int = 4
+const INSPECT_BUTTON_MIN_H: int = 64
 
 
 func _ready() -> void:
@@ -31,10 +51,13 @@ func _ready() -> void:
 	if touch:
 		touch.action_b_pressed.connect(_on_touch_b)
 		touch.action_y_pressed.connect(_on_touch_y)
+	_build_backpack_ui()
 	_update_backpack()
 	_update_extras()
 	_on_floor_changed(GameManager.current_floor)
 
+
+# ── Bot placer / Cancel button ──────────────────────────────────────
 
 func set_bot_placer(placer: BotPlacer) -> void:
 	bot_placer = placer
@@ -45,10 +68,6 @@ func set_bot_placer(placer: BotPlacer) -> void:
 
 
 func _ensure_cancel_button() -> void:
-	## Sprint 2 bug 4: on mobile there is no right-click to cancel placement,
-	## so we surface a visible Cancel button while the bot_placer is active.
-	## The button lives on the HUD (not the touch overlay) so it also works
-	## on desktop if the player prefers clicking over right-clicking.
 	if cancel_placement_btn != null:
 		return
 	cancel_placement_btn = Button.new()
@@ -56,7 +75,6 @@ func _ensure_cancel_button() -> void:
 	cancel_placement_btn.visible = false
 	cancel_placement_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	cancel_placement_btn.process_mode = Node.PROCESS_MODE_ALWAYS
-	# Anchor to bottom-center, above touch action buttons (which sit ~bottom-right).
 	cancel_placement_btn.anchor_left = 0.5
 	cancel_placement_btn.anchor_right = 0.5
 	cancel_placement_btn.anchor_top = 1.0
@@ -75,7 +93,6 @@ func _ensure_cancel_button() -> void:
 func _on_placement_started(_bot_data: BotData) -> void:
 	if cancel_placement_btn:
 		cancel_placement_btn.visible = true
-	# Show placement hint
 	if full_warning:
 		full_warning.text = "Walk to position bot, tap A to place"
 		full_warning.visible = true
@@ -94,17 +111,12 @@ func set_player(player: Player) -> void:
 	_on_health_changed(player.health, player.max_health, player.armor, player.max_armor)
 
 
+# ── Touch / keyboard input routing ──────────────────────────────────
+
 func _on_touch_b() -> void:
 	_touch_b_handled_frame = Engine.get_process_frames()
-	# Close backpack if open — B always dismisses backpack first.
-	# Inline the close logic to guarantee it executes (no intermediary calls).
-	var bp = get_node_or_null("/root/BackpackPanel")
-	if bp and bp._is_open:
-		bp._is_open = false
-		var bp_root = bp.get_node_or_null("Root")
-		if bp_root:
-			bp_root.visible = false
-		get_tree().paused = false
+	if _backpack_open:
+		_close_backpack()
 		return
 	if bot_placer and bot_placer.placing:
 		return
@@ -115,30 +127,42 @@ func _on_touch_b() -> void:
 
 
 func _on_touch_y() -> void:
-	_touch_y_handled_frame = Engine.get_process_frames()
 	# Close build menu first if it's open (mutual exclusion)
 	if build_panel.visible:
 		_close_build_menu()
 		return
-	_toggle_backpack_direct()
-	# If we just opened the backpack, also set the B guard so that _process
-	# cannot accidentally open the build menu on the same frame.
-	var bp = get_node_or_null("/root/BackpackPanel")
-	if bp and bp._is_open:
+	if _backpack_open:
+		_close_backpack()
+	else:
+		_open_backpack()
+		# Set B guard so _process can't open build menu on same frame
 		_touch_b_handled_frame = Engine.get_process_frames()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Consume toggle_backpack (Tab) here so the BackpackPanel autoload
+	# (which has broken @onready refs in-mine) never receives it.
+	if event.is_action_pressed("toggle_backpack"):
+		if build_panel.visible:
+			_close_build_menu()
+		elif _backpack_open:
+			_close_backpack()
+		else:
+			_open_backpack()
+		get_viewport().set_input_as_handled()
+	elif event.is_action_pressed("ui_cancel") and _backpack_open:
+		_close_backpack()
+		get_viewport().set_input_as_handled()
 
 
 func _process(_delta: float) -> void:
 	# --- B button: build menu toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
-		# Skip if the touch signal already handled this press on the same frame.
 		if _touch_b_handled_frame != Engine.get_process_frames():
-			# Close backpack if open — B always dismisses backpack first
-			var bp_b = get_node_or_null("/root/BackpackPanel")
-			if bp_b and bp_b._is_open:
-				_close_backpack_direct()
+			if _backpack_open:
+				_close_backpack()
 			elif bot_placer and bot_placer.placing:
-				pass  # Don't toggle menu during placement
+				pass
 			elif build_panel.visible:
 				_close_build_menu()
 			else:
@@ -146,90 +170,144 @@ func _process(_delta: float) -> void:
 
 	# --- Y button: backpack toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_y"):
-		if _touch_y_handled_frame != Engine.get_process_frames():
-			# Close build menu first if it's open
-			if build_panel.visible:
-				_close_build_menu()
-			else:
-				_toggle_backpack_direct()
+		if build_panel.visible:
+			_close_build_menu()
+		elif _backpack_open:
+			_close_backpack()
+		else:
+			_open_backpack()
 
 
-func _toggle_backpack_direct() -> void:
-	## Toggle BackpackPanel entirely from mining_hud, bypassing all bp methods.
-	## BackpackPanel's @onready / _ready node refs are null, so we fetch every
-	## child dynamically via get_node_or_null at press time.
-	var bp = get_node_or_null("/root/BackpackPanel")
-	if bp == null:
-		return
-	var root = bp.get_node_or_null("Root")
-	if root == null:
-		return
-	# Mutual exclusion: don't open backpack while build menu is showing
-	if not bp._is_open and build_panel.visible:
-		return
-	if bp._is_open:
-		# CLOSE
-		bp._is_open = false
-		root.visible = false
-		get_tree().paused = false
-	else:
-		# OPEN
-		bp._is_open = true
-		bp.visible = true
-		bp.layer = 99
-		root.visible = true
-		get_tree().paused = true
-		_refresh_backpack(bp)
-		# Connect close button if not already connected.
-		# Use a lambda with inline close logic to guarantee execution during pause.
-		var close_btn = bp.get_node_or_null("Root/Panel/VBox/CloseButton")
-		if close_btn:
-			close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
-			if not close_btn.pressed.is_connected(_close_backpack_direct):
-				close_btn.pressed.connect(_close_backpack_direct)
+# ── Backpack panel (built in-scene, no autoload) ────────────────────
+
+func _build_backpack_ui() -> void:
+	backpack_container.process_mode = Node.PROCESS_MODE_ALWAYS
+	backpack_container.mouse_filter = Control.MOUSE_FILTER_STOP
+
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.1, 0.1, 0.14, 0.96)
+	style.border_color = Color(0.5, 0.5, 0.6, 1.0)
+	style.border_width_top = 2
+	style.border_width_bottom = 2
+	style.border_width_left = 2
+	style.border_width_right = 2
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
+	backpack_container.add_theme_stylebox_override("panel", style)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	backpack_container.add_child(scroll)
+
+	var vbox := VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 8)
+	scroll.add_child(vbox)
+
+	# Header row
+	var header := HBoxContainer.new()
+	vbox.add_child(header)
+	var title := Label.new()
+	title.text = "BACKPACK"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(title)
+	_bp_capacity_label = Label.new()
+	_bp_capacity_label.text = "0 / 0"
+	header.add_child(_bp_capacity_label)
+
+	# Body: grid + side panel
+	var body := HBoxContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 12)
+	vbox.add_child(body)
+
+	# Grid wrap
+	var grid_wrap := PanelContainer.new()
+	grid_wrap.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var grid_style := StyleBoxFlat.new()
+	grid_style.bg_color = Color(0.08, 0.08, 0.1, 1.0)
+	grid_style.content_margin_left = 6
+	grid_style.content_margin_right = 6
+	grid_style.content_margin_top = 6
+	grid_style.content_margin_bottom = 6
+	grid_wrap.add_theme_stylebox_override("panel", grid_style)
+	body.add_child(grid_wrap)
+
+	_bp_grid = GridContainer.new()
+	_bp_grid.columns = GRID_COLS
+	_bp_grid.add_theme_constant_override("h_separation", 4)
+	_bp_grid.add_theme_constant_override("v_separation", 4)
+	grid_wrap.add_child(_bp_grid)
+
+	# Side panel
+	var side := VBoxContainer.new()
+	side.custom_minimum_size = Vector2(160, 0)
+	side.add_theme_constant_override("separation", 6)
+	body.add_child(side)
+
+	_bp_gold_label = Label.new()
+	_bp_gold_label.text = "Gold: 0"
+	side.add_child(_bp_gold_label)
+
+	_bp_battery_label = Label.new()
+	_bp_battery_label.text = "Batteries: 0"
+	side.add_child(_bp_battery_label)
+
+	_bp_followers_header = Label.new()
+	_bp_followers_header.text = "FOLLOWERS"
+	side.add_child(_bp_followers_header)
+
+	_bp_followers_list = VBoxContainer.new()
+	side.add_child(_bp_followers_list)
+
+	# Close button
+	var close_btn := Button.new()
+	close_btn.text = "Close"
+	close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	close_btn.pressed.connect(_close_backpack)
+	vbox.add_child(close_btn)
 
 
-func _close_backpack_direct() -> void:
-	## Close BackpackPanel without calling any of its methods.
-	var bp = get_node_or_null("/root/BackpackPanel")
-	if bp == null or not bp._is_open:
+func _open_backpack() -> void:
+	if _backpack_open:
 		return
-	bp._is_open = false
-	var root = bp.get_node_or_null("Root")
-	if root:
-		root.visible = false
+	_backpack_open = true
+	backpack_container.visible = true
+	get_tree().paused = true
+	_refresh_bp()
+
+
+func _close_backpack() -> void:
+	if not _backpack_open:
+		return
+	_backpack_open = false
+	_close_inspect_popup()
+	backpack_container.visible = false
 	get_tree().paused = false
 
 
-func _refresh_backpack(bp: Node) -> void:
-	## Replicate BackpackPanel's _refresh logic using dynamic node lookups.
-	if not bp._is_open:
+func _refresh_bp() -> void:
+	if not _backpack_open:
 		return
-	_refresh_backpack_header(bp)
-	_refresh_backpack_grid(bp)
-	_refresh_backpack_side_panel(bp)
+	_refresh_bp_header()
+	_refresh_bp_grid()
+	_refresh_bp_side()
 
 
-func _refresh_backpack_header(bp: Node) -> void:
-	var title_lbl = bp.get_node_or_null("Root/Panel/VBox/HeaderRow/TitleLabel")
-	var cap_lbl = bp.get_node_or_null("Root/Panel/VBox/HeaderRow/CapacityLabel")
+func _refresh_bp_header() -> void:
 	var used: int = Inventory.get_used_slots()
 	var cap: int = Inventory.get_max_capacity()
-	if title_lbl:
-		title_lbl.text = "BACKPACK"
-	if cap_lbl:
-		cap_lbl.text = "%d / %d" % [used, cap]
+	_bp_capacity_label.text = "%d / %d" % [used, cap]
 
 
-func _refresh_backpack_grid(bp: Node) -> void:
-	var grid = bp.get_node_or_null("Root/Panel/VBox/Body/GridWrap/Grid")
-	if grid == null:
-		return
-	for child in grid.get_children():
+func _refresh_bp_grid() -> void:
+	for child in _bp_grid.get_children():
 		child.queue_free()
 	var cap: int = Inventory.get_max_capacity()
-	var cell_size: int = 80 if _bp_is_touch_device() else 64
-	# Flatten stacks into individual cells
+	var cell_size: int = CELL_SIZE_MOBILE if _is_touch_device() else CELL_SIZE_DESKTOP
 	var cells: Array[Dictionary] = []
 	for slot in Inventory.get_ore_stacks():
 		var qty: int = int(slot.quantity)
@@ -237,7 +315,7 @@ func _refresh_backpack_grid(bp: Node) -> void:
 			cells.append({"ore": slot.ore, "mineral": slot.mineral})
 	for i in range(cap):
 		var cell_data: Dictionary = cells[i] if i < cells.size() else {}
-		grid.add_child(_build_bp_cell(cell_data, cell_size))
+		_bp_grid.add_child(_build_bp_cell(cell_data, cell_size))
 
 
 func _build_bp_cell(cell_data: Dictionary, cell_size: int) -> Control:
@@ -269,44 +347,206 @@ func _build_bp_cell(cell_data: Dictionary, cell_size: int) -> Control:
 	cell.set_meta("ore_id", ore_data.id)
 	cell.set_meta("mineral_id", mineral.id if mineral != null else "")
 	cell.mouse_filter = Control.MOUSE_FILTER_STOP
-	# Cell tap uses BackpackPanel's inspect popup — call it directly on bp
-	cell.gui_input.connect(func(event: InputEvent):
-		var is_click: bool = event is InputEventMouseButton \
-			and (event as InputEventMouseButton).pressed \
-			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
-		var is_tap: bool = event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed
-		if is_click or is_tap:
-			var bp_ref = get_node_or_null("/root/BackpackPanel")
-			if bp_ref:
-				bp_ref._open_inspect_popup(
-					String(cell.get_meta("ore_id", "")),
-					String(cell.get_meta("mineral_id", ""))
-				)
-	)
+	cell.gui_input.connect(_on_bp_cell_input.bind(cell))
 	return cell
 
 
-func _refresh_backpack_side_panel(bp: Node) -> void:
-	var gold_lbl = bp.get_node_or_null("Root/Panel/VBox/Body/SidePanel/GoldLabel")
-	var batt_lbl = bp.get_node_or_null("Root/Panel/VBox/Body/SidePanel/BatteryLabel")
-	var followers_hdr = bp.get_node_or_null("Root/Panel/VBox/Body/SidePanel/FollowersHeader")
-	var followers_lst = bp.get_node_or_null("Root/Panel/VBox/Body/SidePanel/FollowersList")
-	if gold_lbl:
-		gold_lbl.text = "Gold: %d" % GameManager.gold
-	if batt_lbl:
-		batt_lbl.text = "Batteries: %d" % Inventory.batteries
-	if followers_lst:
-		for child in followers_lst.get_children():
-			child.queue_free()
-	if followers_hdr:
-		followers_hdr.text = "FOLLOWERS"
-	if followers_lst == null:
+func _on_bp_cell_input(event: InputEvent, cell: Control) -> void:
+	var is_click: bool = event is InputEventMouseButton \
+		and (event as InputEventMouseButton).pressed \
+		and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
+	var is_tap: bool = event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed
+	if not (is_click or is_tap):
 		return
+	var ore_id: String = String(cell.get_meta("ore_id", ""))
+	var mineral_id: String = String(cell.get_meta("mineral_id", ""))
+	if ore_id == "":
+		return
+	_open_inspect_popup(ore_id, mineral_id)
+
+
+func _is_touch_device() -> bool:
+	if OS.has_feature("web"):
+		return true
+	if OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios"):
+		return true
+	return false
+
+
+# ── Inspect popup (ore detail + drop) ───────────────────────────────
+
+func _open_inspect_popup(ore_id: String, mineral_id: String) -> void:
+	_close_inspect_popup()
+	_inspect_ore_id = ore_id
+	_inspect_mineral_id = mineral_id
+
+	# Dim overlay — tap outside to dismiss
+	_inspect_dim = ColorRect.new()
+	_inspect_dim.color = Color(0, 0, 0, 0.35)
+	_inspect_dim.anchor_right = 1.0
+	_inspect_dim.anchor_bottom = 1.0
+	_inspect_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_inspect_dim.process_mode = Node.PROCESS_MODE_ALWAYS
+	_inspect_dim.gui_input.connect(_on_inspect_dim_input)
+	backpack_container.add_child(_inspect_dim)
+
+	# Popup panel
+	_inspect_popup = PanelContainer.new()
+	_inspect_popup.process_mode = Node.PROCESS_MODE_ALWAYS
+	_inspect_popup.custom_minimum_size = Vector2(360, 260)
+	_inspect_popup.mouse_filter = Control.MOUSE_FILTER_STOP
+	var popup_style: StyleBoxFlat = StyleBoxFlat.new()
+	popup_style.bg_color = Color(0.12, 0.12, 0.16, 0.98)
+	popup_style.border_color = Color(0.7, 0.7, 0.8, 1.0)
+	popup_style.border_width_top = 2
+	popup_style.border_width_bottom = 2
+	popup_style.border_width_left = 2
+	popup_style.border_width_right = 2
+	popup_style.content_margin_left = 16
+	popup_style.content_margin_right = 16
+	popup_style.content_margin_top = 14
+	popup_style.content_margin_bottom = 14
+	_inspect_popup.add_theme_stylebox_override("panel", popup_style)
+	backpack_container.add_child(_inspect_popup)
+
+	_populate_inspect_popup()
+	_center_inspect_popup()
+
+
+func _populate_inspect_popup() -> void:
+	if _inspect_popup == null:
+		return
+	for child in _inspect_popup.get_children():
+		child.queue_free()
+	var slot: Dictionary = _find_stack(_inspect_ore_id, _inspect_mineral_id)
+	var vbox: VBoxContainer = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	_inspect_popup.add_child(vbox)
+	if slot.is_empty():
+		var gone_label: Label = Label.new()
+		gone_label.text = "(stack empty)"
+		vbox.add_child(gone_label)
+		var close_only: Button = Button.new()
+		close_only.text = "Close"
+		close_only.custom_minimum_size = Vector2(0, INSPECT_BUTTON_MIN_H)
+		close_only.pressed.connect(_close_inspect_popup)
+		vbox.add_child(close_only)
+		return
+	var ore: OreData = slot.ore
+	var mineral: MineralData = slot.mineral
+	var qty: int = int(slot.quantity)
+	var title: Label = Label.new()
+	title.text = ore.display_name + " Ore"
+	title.add_theme_font_size_override("font_size", 22)
+	vbox.add_child(title)
+	var tier_label: Label = Label.new()
+	tier_label.text = "Tier %d    x%d" % [ore.tier, qty]
+	vbox.add_child(tier_label)
+	if mineral != null:
+		var mineral_label: Label = Label.new()
+		mineral_label.text = "%s — %s" % [mineral.display_name, mineral.bot_effect_description]
+		mineral_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		mineral_label.custom_minimum_size = Vector2(320, 0)
+		vbox.add_child(mineral_label)
+	var base_value: int = ore.value
+	var mineral_bonus: int = mineral.sell_bonus if mineral != null else 0
+	var sell_text: String
+	if mineral_bonus > 0:
+		sell_text = "Sell: %d gold  (%d base + %d mineral)" % [base_value + mineral_bonus, base_value, mineral_bonus]
+	else:
+		sell_text = "Sell: %d gold" % base_value
+	var sell_label: Label = Label.new()
+	sell_label.text = sell_text
+	vbox.add_child(sell_label)
+	var spacer: Control = Control.new()
+	spacer.custom_minimum_size = Vector2(0, 8)
+	vbox.add_child(spacer)
+	var button_row: HBoxContainer = HBoxContainer.new()
+	button_row.add_theme_constant_override("separation", 12)
+	vbox.add_child(button_row)
+	var drop_button: Button = Button.new()
+	drop_button.text = "Drop 1"
+	drop_button.custom_minimum_size = Vector2(140, INSPECT_BUTTON_MIN_H)
+	drop_button.pressed.connect(_on_drop_pressed)
+	button_row.add_child(drop_button)
+	var close_button_inner: Button = Button.new()
+	close_button_inner.text = "Close"
+	close_button_inner.custom_minimum_size = Vector2(140, INSPECT_BUTTON_MIN_H)
+	close_button_inner.pressed.connect(_close_inspect_popup)
+	button_row.add_child(close_button_inner)
+
+
+func _center_inspect_popup() -> void:
+	if _inspect_popup == null:
+		return
+	await get_tree().process_frame
+	if _inspect_popup == null:
+		return
+	var container_rect: Rect2 = backpack_container.get_global_rect()
+	var popup_size: Vector2 = _inspect_popup.size
+	if popup_size == Vector2.ZERO:
+		popup_size = _inspect_popup.custom_minimum_size
+	var origin: Vector2 = container_rect.position + (container_rect.size - popup_size) * 0.5
+	_inspect_popup.global_position = origin
+
+
+func _find_stack(ore_id: String, mineral_id: String) -> Dictionary:
+	for slot in Inventory.get_ore_stacks():
+		var this_ore: OreData = slot.ore
+		var this_mineral: MineralData = slot.mineral
+		var this_mineral_id: String = this_mineral.id if this_mineral != null else ""
+		if this_ore.id == ore_id and this_mineral_id == mineral_id:
+			return slot
+	return {}
+
+
+func _on_drop_pressed() -> void:
+	if _inspect_ore_id == "":
+		return
+	var ok: bool = Inventory.drop_one(_inspect_ore_id, _inspect_mineral_id)
+	if not ok:
+		_close_inspect_popup()
+		return
+	_refresh_bp_grid()
+	_refresh_bp_header()
+	var remaining: int = Inventory.get_stack_quantity(_inspect_ore_id, _inspect_mineral_id)
+	if remaining <= 0:
+		_close_inspect_popup()
+	else:
+		_populate_inspect_popup()
+
+
+func _on_inspect_dim_input(event: InputEvent) -> void:
+	var is_click: bool = event is InputEventMouseButton \
+		and (event as InputEventMouseButton).pressed \
+		and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT
+	var is_tap: bool = event is InputEventScreenTouch and (event as InputEventScreenTouch).pressed
+	if is_click or is_tap:
+		_close_inspect_popup()
+
+
+func _close_inspect_popup() -> void:
+	if _inspect_popup != null:
+		_inspect_popup.queue_free()
+		_inspect_popup = null
+	if _inspect_dim != null:
+		_inspect_dim.queue_free()
+		_inspect_dim = null
+	_inspect_ore_id = ""
+	_inspect_mineral_id = ""
+
+
+func _refresh_bp_side() -> void:
+	_bp_gold_label.text = "Gold: %d" % GameManager.gold
+	_bp_battery_label.text = "Batteries: %d" % Inventory.batteries
+	for child in _bp_followers_list.get_children():
+		child.queue_free()
+	_bp_followers_header.text = "FOLLOWERS"
 	if Inventory.follower_bots.is_empty():
-		var empty_lbl: Label = Label.new()
-		empty_lbl.text = "No followers"
-		empty_lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
-		followers_lst.add_child(empty_lbl)
+		var empty: Label = Label.new()
+		empty.text = "No followers"
+		empty.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
+		_bp_followers_list.add_child(empty)
 		return
 	for bot_entry in Inventory.follower_bots:
 		var row: HBoxContainer = HBoxContainer.new()
@@ -325,21 +565,13 @@ func _refresh_backpack_side_panel(bp: Node) -> void:
 		var bot_data: BotData = bot_entry.get("data") as BotData
 		name_label.text = "  " + (bot_data.display_name if bot_data else "Bot")
 		row.add_child(name_label)
-		followers_lst.add_child(row)
+		_bp_followers_list.add_child(row)
 
 
-func _bp_is_touch_device() -> bool:
-	if OS.has_feature("web"):
-		return true
-	if OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios"):
-		return true
-	return false
-
+# ── Build menu ──────────────────────────────────────────────────────
 
 func _open_build_step1() -> void:
-	## Step 1: Pick bot type. Game pauses while menu is open.
-	# Close backpack first if it's open
-	_close_backpack_direct()
+	_close_backpack()
 	build_step = 1
 	selected_bot = null
 	build_panel.visible = true
@@ -349,7 +581,6 @@ func _open_build_step1() -> void:
 
 
 func _open_build_step2(bot: BotData) -> void:
-	## Step 2: Pick which ore stack to use.
 	build_step = 2
 	selected_bot = bot
 	_rebuild_ore_list()
@@ -417,7 +648,7 @@ func _rebuild_ore_list() -> void:
 		btn.disabled = not can_afford
 		var oid: String = slot.ore.id
 		var mid := mineral_id
-		var bot := selected_bot  # Capture by value before _close_build_menu nulls it
+		var bot := selected_bot
 		btn.pressed.connect(func():
 			_close_build_menu()
 			bot_placer.select_bot_and_ore(bot, oid, mid)
@@ -429,10 +660,12 @@ func _rebuild_ore_list() -> void:
 	build_list.add_child(back)
 
 
+# ── HUD updates ─────────────────────────────────────────────────────
+
 func _update_backpack() -> void:
 	var used := Inventory.get_used_slots()
 	var max_cap := Inventory.get_max_capacity()
-	var bonus := Inventory.get_remaining_slots() + used - max_cap  # Artifact bonus
+	var bonus := Inventory.get_remaining_slots() + used - max_cap
 	backpack_bar.max_value = max_cap + bonus
 	backpack_bar.value = used
 	backpack_label.text = "Backpack: %d/%d" % [used, max_cap + bonus]
@@ -466,7 +699,6 @@ func _on_health_changed(hp: float, max_hp: float, armor: float, max_armor: float
 
 func _update_extras() -> void:
 	battery_label.text = "Batteries: %d" % Inventory.batteries
-	# Artifact display
 	if Inventory.artifacts.is_empty():
 		artifact_label.visible = false
 	else:
