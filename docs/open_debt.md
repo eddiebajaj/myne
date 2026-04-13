@@ -8,23 +8,29 @@ Carried forward each sprint. Items are added when deferred, removed when resolve
 
 | ID | Debt | Origin | Priority | Notes |
 |---|---|---|---|---|
-| D1 | `_random_enemy()` aggro/leash gap at T2-T4 | Sprint 2 | Medium | T1 patched in `_make_enemy_data()`, T2-T4 still use defaults with no aggro/leash |
-| D2 | Dead code `_spawn_loot()` in `cave_entrance.gd` | Sprint 2 | Low | Cleanup candidate, no functional impact |
-| D3 | `Player._apply_upgrades()` armor sync vs GameManager restore | Sprint 2 | Watch | Harmless today, fragile if Smith upgrade logic forks |
-| D4 | Design T2 balance values (B6F-B10F) | Sprint 1 | High | Only T1 is tuned; T2 ore/enemies/bots use placeholder values |
-| D5 | Mineral effect multipliers per mineral type | Sprint 1 | Medium | Fire=damage, Ice=slow, etc. — designed but not implemented |
-| D6 | Save system (3 manual + 1 auto) | Sprint 1 | High | Designed in doc 12, not implemented. Players lose all progress on page close |
-| D7 | Permanent bots + merge system | Sprint 1 | High | Designed in doc 10, not implemented. Signature feature |
-| D8 | Story/narrative wiring | Sprint 1 | Medium | Letters, NPC dialogue, story gates — designed in doc 11 |
-| D9 | Enemy pathfinding around interior walls | Sprint 3 | Medium | Needed for Two Chambers and Cross Corridor templates — enemies may get stuck on walls |
-| D10 | 2D juicing (normal maps, CanvasItem lights, shader fog) | Sprint 1 | Low | Visual polish, deferred repeatedly |
+| D1 | `_random_enemy()` aggro/leash gap at T2-T4 | Sprint 2 | Medium | T1 patched, T2-T4 still use defaults |
+| D2 | Dead code `_spawn_loot()` in `cave_entrance.gd` | Sprint 2 | Low | Cleanup candidate |
+| D3 | `Player._apply_upgrades()` armor sync fragility | Sprint 2 | Watch | Harmless today, fragile if Smith logic forks |
+| D4 | Design T2 balance values (B6F-B10F) | Sprint 1 | High | Only T1 is tuned |
+| D5 | Mineral effect multipliers per type | Sprint 1 | Medium | Fire=damage, Ice=slow, etc. — designed not implemented |
+| D6 | Save system (3 manual + 1 auto) | Sprint 1 | High | Players lose all progress on page close |
+| D7 | Permanent bots + merge system | Sprint 1 | High | Signature feature, designed not implemented |
+| D8 | Story/narrative wiring | Sprint 1 | Medium | Letters, NPC dialogue, story gates |
+| D9 | Enemy pathfinding around interior walls | Sprint 3 | Medium | Enemies may get stuck on template walls |
+| D10 | 2D juicing (normal maps, lights, shaders) | Sprint 1 | Low | Visual polish deferred |
+| D11 | BackpackPanel autoload is dead code in mine | Sprint 3 | Low | Still registered, may be used in town |
+| D12 | Town scene input/UI overhaul | Sprint 3 | Medium | Town still uses old input patterns |
 
-## Resolved
+## Resolved (Sprint 3)
 
 | ID | Debt | Resolved In | How |
 |---|---|---|---|
-| — | Floor templates (1400x1000 + 3 layouts) | Sprint 3 | Implemented per spec |
-| — | Build menu not opening (touch + desktop) | Sprint 3 | Changed `_unhandled_input` to `_process` + `Input.is_action_just_pressed` |
-| — | Mining Rig attack_speed = 0 (division by zero) | Sprint 3 | Set to 1.0 |
-| — | Follower bots not respawning across floors | Sprint 3 | Added `_respawn_follower_bots()` in controller |
-| — | Bot health storage using wrong property | Sprint 3 | Changed to `bot.get_scaled_health(ore_tier)` |
+| — | Floor templates (1400×1000 + 3 layouts) | Sprint 3 | Implemented per spec |
+| — | Build menu not opening | Sprint 3 | Fixed input handling |
+| — | Mining Rig attack_speed=0 | Sprint 3 | Set to 1.0 |
+| — | Follower bots not respawning across floors | Sprint 3 | Added `_respawn_follower_bots()` |
+| — | Bot health storage wrong property | Sprint 3 | `get_scaled_health(ore_tier)` |
+| — | selected_bot null from closure capture | Sprint 3 | Captured by value before close |
+| — | Touch input unreliable (Input.action_press) | Sprint 3 | InputEventAction via parse_input_event |
+| — | D-pad replaced with virtual joystick | Sprint 3 | Console A/B/Y layout |
+| — | Backpack autoload broken on web | Sprint 3 | Rebuilt UI in-scene inside MiningHUD |
