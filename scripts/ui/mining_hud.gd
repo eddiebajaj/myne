@@ -95,15 +95,19 @@ func set_player(player: Player) -> void:
 
 
 func _on_touch_b() -> void:
-	# Close backpack if open — B always dismisses backpack first
+	_touch_b_handled_frame = Engine.get_process_frames()
+	# Close backpack if open — B always dismisses backpack first.
+	# Inline the close logic to guarantee it executes (no intermediary calls).
 	var bp = get_node_or_null("/root/BackpackPanel")
 	if bp and bp._is_open:
-		_close_backpack_direct()
-		_touch_b_handled_frame = Engine.get_process_frames()
+		bp._is_open = false
+		var bp_root = bp.get_node_or_null("Root")
+		if bp_root:
+			bp_root.visible = false
+		get_tree().paused = false
 		return
 	if bot_placer and bot_placer.placing:
 		return
-	_touch_b_handled_frame = Engine.get_process_frames()
 	if build_panel.visible:
 		_close_build_menu()
 	else:
@@ -112,41 +116,42 @@ func _on_touch_b() -> void:
 
 func _on_touch_y() -> void:
 	_touch_y_handled_frame = Engine.get_process_frames()
-	# Close build menu first if it's open
+	# Close build menu first if it's open (mutual exclusion)
 	if build_panel.visible:
 		_close_build_menu()
 		return
 	_toggle_backpack_direct()
+	# If we just opened the backpack, also set the B guard so that _process
+	# cannot accidentally open the build menu on the same frame.
+	var bp = get_node_or_null("/root/BackpackPanel")
+	if bp and bp._is_open:
+		_touch_b_handled_frame = Engine.get_process_frames()
 
 
 func _process(_delta: float) -> void:
 	# --- B button: build menu toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
 		# Skip if the touch signal already handled this press on the same frame.
-		if _touch_b_handled_frame == Engine.get_process_frames():
-			return
-		# Close backpack if open — B always dismisses backpack first
-		var bp_b = get_node_or_null("/root/BackpackPanel")
-		if bp_b and bp_b._is_open:
-			_close_backpack_direct()
-			return
-		# Don't toggle menu while bot_placer is in placement mode — it handles its own cancel
-		if bot_placer and bot_placer.placing:
-			return
-		if build_panel.visible:
-			_close_build_menu()
-		else:
-			_open_build_step1()
+		if _touch_b_handled_frame != Engine.get_process_frames():
+			# Close backpack if open — B always dismisses backpack first
+			var bp_b = get_node_or_null("/root/BackpackPanel")
+			if bp_b and bp_b._is_open:
+				_close_backpack_direct()
+			elif bot_placer and bot_placer.placing:
+				pass  # Don't toggle menu during placement
+			elif build_panel.visible:
+				_close_build_menu()
+			else:
+				_open_build_step1()
 
 	# --- Y button: backpack toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_y"):
-		if _touch_y_handled_frame == Engine.get_process_frames():
-			return
-		# Close build menu first if it's open
-		if build_panel.visible:
-			_close_build_menu()
-			return
-		_toggle_backpack_direct()
+		if _touch_y_handled_frame != Engine.get_process_frames():
+			# Close build menu first if it's open
+			if build_panel.visible:
+				_close_build_menu()
+			else:
+				_toggle_backpack_direct()
 
 
 func _toggle_backpack_direct() -> void:
@@ -158,6 +163,9 @@ func _toggle_backpack_direct() -> void:
 		return
 	var root = bp.get_node_or_null("Root")
 	if root == null:
+		return
+	# Mutual exclusion: don't open backpack while build menu is showing
+	if not bp._is_open and build_panel.visible:
 		return
 	if bp._is_open:
 		# CLOSE
@@ -172,10 +180,13 @@ func _toggle_backpack_direct() -> void:
 		root.visible = true
 		get_tree().paused = true
 		_refresh_backpack(bp)
-		# Connect close button if not already connected
+		# Connect close button if not already connected.
+		# Use a lambda with inline close logic to guarantee execution during pause.
 		var close_btn = bp.get_node_or_null("Root/Panel/VBox/CloseButton")
-		if close_btn and not close_btn.pressed.is_connected(_close_backpack_direct):
-			close_btn.pressed.connect(_close_backpack_direct)
+		if close_btn:
+			close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+			if not close_btn.pressed.is_connected(_close_backpack_direct):
+				close_btn.pressed.connect(_close_backpack_direct)
 
 
 func _close_backpack_direct() -> void:
