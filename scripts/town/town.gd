@@ -56,6 +56,11 @@ func _ready() -> void:
 		touch.action_a_pressed.connect(_on_touch_a)
 		touch.action_b_pressed.connect(_on_touch_b)
 	_refresh_stats()
+	# Show Scout unlock notification if just unlocked
+	if GameManager._scout_just_unlocked and not GameManager.scout_unlocked_notified:
+		GameManager._scout_just_unlocked = false
+		GameManager.scout_unlocked_notified = true
+		_show_scout_unlock_popup()
 
 
 func _build_town_hud() -> void:
@@ -309,3 +314,58 @@ func _on_sell_ore() -> void:
 			sell_result.modulate.a = 1.0
 		)
 	_refresh_stats()
+
+
+func _show_scout_unlock_popup() -> void:
+	## Display a temporary notification that the Scout companion has been unlocked.
+	var popup_layer := CanvasLayer.new()
+	popup_layer.layer = 60
+	add_child(popup_layer)
+
+	var panel := PanelContainer.new()
+	panel.anchor_left = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_top = 0.3
+	panel.anchor_bottom = 0.3
+	panel.offset_left = -220
+	panel.offset_right = 220
+	panel.offset_top = -80
+	panel.offset_bottom = 80
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.08, 0.12, 0.18, 0.95)
+	style.border_color = Color(0.3, 0.9, 1.0)
+	style.border_width_top = 3
+	style.border_width_bottom = 3
+	style.border_width_left = 3
+	style.border_width_right = 3
+	style.content_margin_left = 20
+	style.content_margin_right = 20
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
+	panel.add_theme_stylebox_override("panel", style)
+	popup_layer.add_child(panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	panel.add_child(vbox)
+
+	var title_label := Label.new()
+	title_label.text = "Crystal Companion Found!"
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.add_theme_font_size_override("font_size", 26)
+	title_label.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0))
+	vbox.add_child(title_label)
+
+	var desc_label := Label.new()
+	desc_label.text = "Scout joins your party."
+	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	desc_label.add_theme_font_size_override("font_size", 20)
+	vbox.add_child(desc_label)
+
+	# Fade out after 3 seconds
+	var tween := create_tween()
+	tween.tween_interval(3.0)
+	tween.tween_property(panel, "modulate:a", 0.0, 1.0)
+	tween.tween_callback(func() -> void:
+		popup_layer.queue_free()
+	)

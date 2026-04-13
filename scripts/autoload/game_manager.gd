@@ -15,6 +15,8 @@ var deepest_checkpoint: int = 0
 var run_start_floor: int = 1
 var gold: int = 0
 var total_runs: int = 0
+var scout_unlocked_notified: bool = false
+var _scout_just_unlocked: bool = false  # Set true when Scout is unlocked mid-run, read by town
 
 # --- Run-persistent player vitals ---
 # These survive scene reloads (e.g. descending stairs rebuilds mining_floor.tscn).
@@ -80,6 +82,10 @@ func go_deeper() -> void:
 			deepest_checkpoint = current_floor
 		Inventory.save_checkpoint()
 		checkpoint_reached.emit(current_floor)
+		# Unlock Scout on first B5F checkpoint
+		if current_floor >= 5 and not Inventory.has_permanent_bot("scout"):
+			Inventory.unlock_permanent_bot("scout", "Scout", 40.0)
+			_scout_just_unlocked = true
 	floor_changed.emit(current_floor)
 
 
@@ -88,6 +94,7 @@ func return_to_town() -> void:
 		return
 	current_state = GameState.TRANSITIONING
 	Inventory.end_run(false)
+	Inventory.restore_permanent_bots()
 	get_tree().change_scene_to_file("res://scenes/town/town.tscn")
 	current_state = GameState.TOWN
 	state_changed.emit(current_state)
@@ -99,6 +106,7 @@ func die() -> void:
 	current_state = GameState.TRANSITIONING
 	player_died.emit()
 	Inventory.end_run(true)
+	Inventory.restore_permanent_bots()
 	get_tree().change_scene_to_file("res://scenes/town/town.tscn")
 	current_state = GameState.TOWN
 	state_changed.emit(current_state)

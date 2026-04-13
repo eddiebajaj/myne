@@ -23,6 +23,13 @@ var checkpoint_bots: Array[Dictionary] = []
 # --- Artifacts (run-only buffs, cleared on return/death) ---
 var artifacts: Array[Dictionary] = []  # [{data: ArtifactData}] or [{id: String, ...}]
 
+# --- Permanent bots (persist across runs, never lost) ---
+var permanent_bots: Array[Dictionary] = []
+# [{id: "scout", display_name: "Scout", max_health: 40.0, health: 40.0, knocked_out: false}]
+
+var run_party: Array[Dictionary] = []
+# Subset of permanent_bots selected for this run (auto-populated for now)
+
 # --- Persistent storage ---
 var mineral_storage: Array[MineralData] = []  # Lab-extracted minerals
 var blueprints: Array[String] = []            # Unlocked bot variant IDs
@@ -281,6 +288,54 @@ func take_stored_mineral(mineral_id: String) -> MineralData:
 	return null
 
 
+# === Permanent Bots ===
+
+func unlock_permanent_bot(id: String, display_name: String, max_hp: float) -> void:
+	if has_permanent_bot(id):
+		return
+	permanent_bots.append({
+		"id": id,
+		"display_name": display_name,
+		"max_health": max_hp,
+		"health": max_hp,
+		"knocked_out": false,
+	})
+
+
+func has_permanent_bot(id: String) -> bool:
+	for bot in permanent_bots:
+		if bot.get("id", "") == id:
+			return true
+	return false
+
+
+func knock_out_bot(id: String) -> void:
+	for entry in run_party:
+		if entry.get("id", "") == id:
+			entry["knocked_out"] = true
+			entry["health"] = 0.0
+			break
+
+
+func restore_permanent_bots() -> void:
+	## Called on return to town. Resets HP and knocked_out for all permanent bots.
+	for bot in permanent_bots:
+		bot["health"] = bot.get("max_health", 40.0)
+		bot["knocked_out"] = false
+
+
+func _populate_run_party() -> void:
+	## Auto-populate run_party from permanent_bots (all non-knocked-out, max 2).
+	run_party.clear()
+	var count := 0
+	for bot in permanent_bots:
+		if count >= 2:
+			break
+		if not bot.get("knocked_out", false):
+			run_party.append(bot.duplicate())
+			count += 1
+
+
 # === Run Lifecycle ===
 
 func begin_run() -> void:
@@ -290,6 +345,8 @@ func begin_run() -> void:
 	artifacts.clear()
 	# Start each run with 3 batteries for testing
 	batteries = 3
+	# Populate run party from permanent bots
+	_populate_run_party()
 	inventory_changed.emit()
 	bots_changed.emit()
 
@@ -303,6 +360,9 @@ func end_run(died: bool) -> void:
 	# Follower bots lost on return
 	follower_bots.clear()
 	checkpoint_bots.clear()
+	# Permanent bots restored on return to town
+	run_party.clear()
+	restore_permanent_bots()
 	inventory_changed.emit()
 	bots_changed.emit()
 

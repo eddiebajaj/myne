@@ -542,13 +542,27 @@ func _refresh_bp_side() -> void:
 	for child in _bp_followers_list.get_children():
 		child.queue_free()
 	_bp_followers_header.text = "FOLLOWERS"
-	if Inventory.follower_bots.is_empty():
-		var empty: Label = Label.new()
-		empty.text = "No followers"
-		empty.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
-		_bp_followers_list.add_child(empty)
-		return
+	var has_any := false
+	# Show permanent bots (from run_party)
+	for entry in Inventory.run_party:
+		has_any = true
+		var row: HBoxContainer = HBoxContainer.new()
+		var pip: ColorRect = ColorRect.new()
+		pip.custom_minimum_size = Vector2(12, 12)
+		pip.color = Color(0.3, 0.9, 1.0)  # cyan for permanent bots
+		row.add_child(pip)
+		var name_label: Label = Label.new()
+		var dname: String = entry.get("display_name", "Companion")
+		if entry.get("knocked_out", false):
+			name_label.text = "  %s (KO)" % dname
+			name_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55))
+		else:
+			name_label.text = "  %s" % dname
+		row.add_child(name_label)
+		_bp_followers_list.add_child(row)
+	# Show disposable follower bots
 	for bot_entry in Inventory.follower_bots:
+		has_any = true
 		var row: HBoxContainer = HBoxContainer.new()
 		var pip: ColorRect = ColorRect.new()
 		pip.custom_minimum_size = Vector2(12, 12)
@@ -566,6 +580,11 @@ func _refresh_bp_side() -> void:
 		name_label.text = "  " + (bot_data.display_name if bot_data else "Bot")
 		row.add_child(name_label)
 		_bp_followers_list.add_child(row)
+	if not has_any:
+		var empty: Label = Label.new()
+		empty.text = "No followers"
+		empty.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
+		_bp_followers_list.add_child(empty)
 
 
 # ── Build menu ──────────────────────────────────────────────────────
