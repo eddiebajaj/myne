@@ -13,13 +13,17 @@ Carried forward each sprint. Items are added when deferred, removed when resolve
 | D3 | `Player._apply_upgrades()` armor sync fragility | Sprint 2 | Watch | Harmless today, fragile if Smith logic forks |
 | D4 | Design T2 balance values (B6F-B10F) | Sprint 1 | High | Only T1 is tuned |
 | D5 | Mineral effect multipliers per type | Sprint 1 | Medium | Fire=damage, Ice=slow, etc. — designed not implemented |
-| D6 | Save system (3 manual + 1 auto) | Sprint 1 | High | Players lose all progress on page close |
-| D7 | Permanent bots + merge system | Sprint 1 | High | Signature feature, designed not implemented |
+| D6 | Save system (3 manual + 1 auto) | Sprint 1 | Medium | Deferred — fun first, persistence later (Eddie's call) |
+| D7 | Permanent bots + merge system | Sprint 1 | **Partial** | Scout + solo merge done (Sprint 4). Dual merge, roster, Crystal Power rework = Sprint 5 |
 | D8 | Story/narrative wiring | Sprint 1 | Medium | Letters, NPC dialogue, story gates |
 | D9 | Enemy pathfinding around interior walls | Sprint 3 | Medium | Enemies may get stuck on template walls |
-| D10 | 2D juicing (normal maps, lights, shaders) | Sprint 1 | Low | Visual polish deferred |
+| D10 | 2D juicing (normal maps, lights, shaders) | Sprint 1 | Low | Combat readability done (Sprint 4). Pixel art pass = Sprint 5 |
 | D11 | BackpackPanel autoload is dead code in mine | Sprint 3 | Low | Still registered, may be used in town |
 | D12 | Town scene input/UI overhaul | Sprint 3 | Medium | Town still uses old input patterns |
+| D13 | Economy rework: Crystal Power, remove batteries/disposable bots | Sprint 4 | **High** | Full design locked, implementation = Sprint 5 |
+| D14 | Lab rework: bot hub (build, upgrade, necklace, merge) | Sprint 4 | **High** | Design locked, implementation = Sprint 5 |
+| D15 | Blueprint progression system | Sprint 4 | High | Common + rare blueprints, story unlocks |
+| D16 | Pixel art pass (32x32, Binding of Isaac ref) | Sprint 4 | High | Style locked, production = Sprint 5 |
 
 ## Resolved (Sprint 3)
 
