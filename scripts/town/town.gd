@@ -14,6 +14,8 @@ extends Node2D
 
 var mine_entrance_in_range: bool = false
 var mine_panel_open: bool = false
+var storage_shed_in_range: bool = false
+var storage_panel_open: bool = false
 var selected_checkpoint: int = 0
 var _touch_b_handled_frame: int = -1
 var town_gold_label: Label = null
@@ -54,6 +56,8 @@ func _ready() -> void:
 	mine_entrance.body_exited.connect(_on_mine_entrance_exited)
 	_build_town_hud()
 	_build_mine_panel()
+	_build_storage_shed()
+	_build_storage_panel()
 	GameManager.gold_changed.connect(_on_gold_changed)
 	GameManager.checkpoint_reached.connect(_on_checkpoint_reached)
 	Inventory.inventory_changed.connect(_refresh_persistent_hud)
@@ -392,29 +396,43 @@ func _refresh_stats() -> void:
 
 
 func _on_touch_a() -> void:
-	if mine_entrance_in_range and not mine_panel_open:
+	if mine_panel_open or storage_panel_open:
+		return
+	if mine_entrance_in_range:
 		_open_mine_panel()
+	elif storage_shed_in_range:
+		_open_storage_panel()
 
 
 func _on_touch_b() -> void:
 	if mine_panel_open:
 		_touch_b_handled_frame = Engine.get_process_frames()
 		_close_mine_panel()
+	elif storage_panel_open:
+		_touch_b_handled_frame = Engine.get_process_frames()
+		_close_storage_panel()
 
 
 func _process(_delta: float) -> void:
 	# Refresh stats periodically (after NPC interactions)
 	if Engine.get_physics_frames() % 30 == 0:
 		_refresh_stats()
-	# B closes mine panel (keyboard fallback)
-	if mine_panel_open and Input.is_action_just_pressed("action_b"):
-		if _touch_b_handled_frame == Engine.get_process_frames():
-			return
-		_close_mine_panel()
-		return
+	# B closes any panel (keyboard fallback)
+	if Input.is_action_just_pressed("action_b"):
+		if _touch_b_handled_frame != Engine.get_process_frames():
+			if mine_panel_open:
+				_close_mine_panel()
+				return
+			if storage_panel_open:
+				_close_storage_panel()
+				return
 	# Mine entrance interaction (keyboard fallback)
-	if mine_entrance_in_range and not mine_panel_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
+	if mine_entrance_in_range and not mine_panel_open and not storage_panel_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
 		_open_mine_panel()
+		return
+	# Storage shed interaction (keyboard fallback)
+	if storage_shed_in_range and not storage_panel_open and not mine_panel_open and (Input.is_action_just_pressed("interact") or Input.is_action_just_pressed("action_a")):
+		_open_storage_panel()
 
 
 func _on_sell_ore() -> void:
@@ -433,3 +451,233 @@ func _on_sell_ore() -> void:
 
 
 # (Scout unlock popup removed in Sprint 5 — Scout is now a Lab purchase.)
+
+
+# ── Storage Shed ────────────────────────────────────────────────────
+
+var storage_shed_area: Area2D = null
+var storage_panel_layer: CanvasLayer = null
+var storage_panel_dim: ColorRect = null
+var storage_panel: PanelContainer = null
+var storage_backpack_list: VBoxContainer = null
+var storage_storage_list: VBoxContainer = null
+var storage_storage_header: Label = null
+var storage_result_label: Label = null
+
+
+func _build_storage_shed() -> void:
+	## Build a Storage Shed interactable — Area2D with visual + proximity trigger.
+	## Placed to the right of the mine entrance in the town scene.
+	storage_shed_area = Area2D.new()
+	storage_shed_area.name = "StorageShed"
+	storage_shed_area.position = Vector2(900, 380)
+	storage_shed_area.collision_layer = 0
+	storage_shed_area.collision_mask = 1
+	var rect := ColorRect.new()
+	rect.name = "Sprite"
+	rect.size = Vector2(48, 48)
+	rect.position = Vector2(-24, -24)
+	rect.color = Color(0.55, 0.38, 0.22)  # warm brown
+	storage_shed_area.add_child(rect)
+	var shape := CollisionShape2D.new()
+	var cs := RectangleShape2D.new()
+	cs.size = Vector2(56, 56)
+	shape.shape = cs
+	storage_shed_area.add_child(shape)
+	var lbl := Label.new()
+	lbl.name = "Label"
+	lbl.text = "Storage [E]"
+	lbl.position = Vector2(-40, 28)
+	lbl.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	lbl.add_theme_constant_override("outline_size", 2)
+	storage_shed_area.add_child(lbl)
+	add_child(storage_shed_area)
+	storage_shed_area.body_entered.connect(_on_storage_shed_entered)
+	storage_shed_area.body_exited.connect(_on_storage_shed_exited)
+
+
+func _on_storage_shed_entered(body: Node2D) -> void:
+	if body is Player:
+		storage_shed_in_range = true
+
+
+func _on_storage_shed_exited(body: Node2D) -> void:
+	if body is Player:
+		storage_shed_in_range = false
+		if storage_panel_open:
+			_close_storage_panel()
+
+
+func _build_storage_panel() -> void:
+	storage_panel_layer = CanvasLayer.new()
+	storage_panel_layer.name = "StoragePanelLayer"
+	storage_panel_layer.layer = 50
+	storage_panel_layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(storage_panel_layer)
+
+	storage_panel_dim = ColorRect.new()
+	storage_panel_dim.color = Color(0, 0, 0, 0.55)
+	storage_panel_dim.anchor_right = 1.0
+	storage_panel_dim.anchor_bottom = 1.0
+	storage_panel_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	storage_panel_layer.add_child(storage_panel_dim)
+
+	storage_panel = PanelContainer.new()
+	storage_panel.anchor_left = 0.5
+	storage_panel.anchor_top = 0.5
+	storage_panel.anchor_right = 0.5
+	storage_panel.anchor_bottom = 0.5
+	storage_panel.custom_minimum_size = Vector2(640, 0)
+	storage_panel_layer.add_child(storage_panel)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	storage_panel.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "STORAGE SHED"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 28)
+	vbox.add_child(title)
+	vbox.add_child(HSeparator.new())
+
+	# Two-column split
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 16)
+	vbox.add_child(cols)
+
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 4)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cols.add_child(left)
+	var lh := Label.new()
+	lh.text = "Backpack"
+	lh.add_theme_font_size_override("font_size", 18)
+	left.add_child(lh)
+	storage_backpack_list = VBoxContainer.new()
+	storage_backpack_list.add_theme_constant_override("separation", 2)
+	left.add_child(storage_backpack_list)
+
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 4)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cols.add_child(right)
+	storage_storage_header = Label.new()
+	storage_storage_header.text = "Storage (0/48)"
+	storage_storage_header.add_theme_font_size_override("font_size", 18)
+	right.add_child(storage_storage_header)
+	storage_storage_list = VBoxContainer.new()
+	storage_storage_list.add_theme_constant_override("separation", 2)
+	right.add_child(storage_storage_list)
+
+	vbox.add_child(HSeparator.new())
+
+	var deposit_btn := Button.new()
+	deposit_btn.text = "Deposit All"
+	deposit_btn.pressed.connect(_on_storage_deposit_all)
+	vbox.add_child(deposit_btn)
+
+	storage_result_label = Label.new()
+	storage_result_label.text = ""
+	storage_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(storage_result_label)
+
+	var close_btn := Button.new()
+	close_btn.text = "Close"
+	close_btn.pressed.connect(_close_storage_panel)
+	vbox.add_child(close_btn)
+
+	storage_panel.visible = false
+	storage_panel_dim.visible = false
+	storage_panel.offset_left = -320
+	storage_panel.offset_top = -240
+	storage_panel.offset_right = 320
+	storage_panel.offset_bottom = 240
+
+
+func _open_storage_panel() -> void:
+	if storage_panel_open:
+		return
+	storage_panel_open = true
+	storage_panel.visible = true
+	storage_panel_dim.visible = true
+	get_tree().paused = true
+	_refresh_storage_panel()
+
+
+func _close_storage_panel() -> void:
+	if not storage_panel_open:
+		return
+	storage_panel_open = false
+	storage_panel.visible = false
+	storage_panel_dim.visible = false
+	storage_result_label.text = ""
+	get_tree().paused = false
+
+
+func _refresh_storage_panel() -> void:
+	# Backpack column
+	for c in storage_backpack_list.get_children():
+		c.queue_free()
+	var bp_stacks: Array[Dictionary] = Inventory.get_ore_stacks()
+	if bp_stacks.is_empty():
+		var e := Label.new()
+		e.text = "(empty)"
+		storage_backpack_list.add_child(e)
+	else:
+		for slot in bp_stacks:
+			var lbl := Label.new()
+			var stack_name: String = _storage_stack_name(slot)
+			lbl.text = "%s x%d" % [stack_name, int(slot.quantity)]
+			storage_backpack_list.add_child(lbl)
+
+	# Storage column
+	for c in storage_storage_list.get_children():
+		c.queue_free()
+	storage_storage_header.text = "Storage (%d/%d)" % [Inventory.get_storage_used(), Inventory.STORAGE_CAPACITY]
+	var st_stacks: Array[Dictionary] = Inventory.get_storage_stacks()
+	if st_stacks.is_empty():
+		var e2 := Label.new()
+		e2.text = "(empty)"
+		storage_storage_list.add_child(e2)
+	else:
+		for slot in st_stacks:
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			var lbl := Label.new()
+			var stack_name: String = _storage_stack_name(slot)
+			lbl.text = "%s x%d" % [stack_name, int(slot.quantity)]
+			lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			row.add_child(lbl)
+			var btn := Button.new()
+			btn.text = "Withdraw 1"
+			btn.disabled = Inventory.get_remaining_slots() <= 0
+			var ore_id: String = slot.ore.id
+			var mineral_id: String = slot.mineral.id if slot.mineral else ""
+			btn.pressed.connect(func(): _on_storage_withdraw_one(ore_id, mineral_id))
+			row.add_child(btn)
+			storage_storage_list.add_child(row)
+
+
+func _storage_stack_name(slot: Dictionary) -> String:
+	var base: String = slot.ore.display_name
+	if slot.mineral:
+		return "%s (%s)" % [base, slot.mineral.display_name]
+	return base
+
+
+func _on_storage_deposit_all() -> void:
+	var moved: int = Inventory.deposit_all_to_storage()
+	if moved > 0:
+		storage_result_label.text = "Deposited %d pieces." % moved
+	else:
+		storage_result_label.text = "Nothing to deposit (or storage full)."
+	_refresh_storage_panel()
+
+
+func _on_storage_withdraw_one(ore_id: String, mineral_id: String) -> void:
+	if Inventory.withdraw_one_from_storage(ore_id, mineral_id):
+		storage_result_label.text = "Withdrew 1."
+	else:
+		storage_result_label.text = "Backpack full or item missing."
+	_refresh_storage_panel()

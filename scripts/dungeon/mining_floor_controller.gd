@@ -43,31 +43,63 @@ func _respawn_permanent_bots() -> void:
 func _spawn_permanent_bot(entry: Dictionary, pos: Vector2) -> void:
 	## Build a permanent bot scene programmatically and add it to the floor.
 	## Applies Lab upgrade levels (hp_upgrade_level / damage_upgrade_level) to
-	## the base Scout stats from Sprint 4.
+	## the base stats for the bot type.
 	var bot_id: String = entry.get("id", "")
 	var dname: String = entry.get("display_name", "Companion")
 	var hp_up: int = int(entry.get("hp_upgrade_level", 0))
 	var dmg_up: int = int(entry.get("damage_upgrade_level", 0))
 
-	# Scout-specific stats (from spec A3), with Lab upgrade bonuses applied
+	# Per-bot base stats (Sprint 5 Round 2 spec §1)
+	var atk_range: float = 130.0
+	var atk_speed: float = 1.2
+	var move_spd: float = 120.0
+	var follow_dist: float = 50.0
+	var bot_color: Color = Color(0.3, 0.9, 1.0)
+	var bot_size: Vector2 = Vector2(28, 28)
+	var script_path: String = "res://scripts/bots/permanent_bot.gd"
+
+	match bot_id:
+		"miner":
+			atk_range = 80.0
+			atk_speed = 1.0 / 1.5  # one mining hit every 1.5s
+			move_spd = 100.0
+			follow_dist = 50.0
+			bot_color = Color(0.9, 0.7, 0.3)  # amber/yellow
+			script_path = "res://scripts/bots/permanent_bot_miner.gd"
+		"striker":
+			atk_range = 45.0
+			atk_speed = 0.8
+			move_spd = 110.0
+			follow_dist = 50.0
+			bot_color = Color(1.0, 0.35, 0.35)  # red
+			script_path = "res://scripts/bots/permanent_bot_striker.gd"
+		"backpack_bot":
+			atk_range = 0.0
+			atk_speed = 0.0
+			move_spd = 100.0
+			follow_dist = 50.0
+			bot_color = Color(0.5, 0.35, 0.2)  # brown
+			script_path = "res://scripts/bots/permanent_bot_backpack.gd"
+		"scout", _:
+			atk_range = 130.0
+			atk_speed = 1.2
+			move_spd = 120.0
+			follow_dist = 50.0
+			bot_color = Color(0.3, 0.9, 1.0)  # cyan
+			script_path = "res://scripts/bots/permanent_bot.gd"
+
+	# Upgrade bonuses apply on top of base stats stored in the entry
 	var base_max_hp: float = float(entry.get("max_health", 40.0)) + hp_up * 10.0
-	var base_damage: float = float(entry.get("damage", 5.0)) + dmg_up * 1.0
+	var base_damage: float = float(entry.get("damage", 0.0)) + dmg_up * 1.0
 	var current_hp: float = minf(float(entry.get("health", base_max_hp)), base_max_hp)
 	# Keep the entry's max_health in sync so HUD / merge respawn use upgraded value
 	entry["max_health"] = base_max_hp
 	entry["damage"] = base_damage
 
-	var atk_range := 130.0
-	var atk_speed := 1.2
-	var move_spd := 120.0
-	var follow_dist := 50.0
-	var bot_color := Color(0.3, 0.9, 1.0)  # bright cyan
-	var bot_size := Vector2(28, 28)
-
 	# Build the scene tree
 	var root := CharacterBody2D.new()
 	root.name = dname.replace(" ", "")
-	root.set_script(load("res://scripts/bots/permanent_bot.gd"))
+	root.set_script(load(script_path))
 	root.collision_layer = 8
 	root.collision_mask = 20
 
@@ -112,5 +144,9 @@ func _spawn_permanent_bot(entry: Dictionary, pos: Vector2) -> void:
 	root.health = current_hp
 	if root.health_bar:
 		root.health_bar.value = current_hp
+	# Tint the sprite using the per-bot color resolved above
+	var sprite_rect: ColorRect = root.get_node_or_null("Sprite") as ColorRect
+	if sprite_rect:
+		sprite_rect.color = bot_color
 	root.add_to_group("bots")
 	root.add_to_group("permanent_bots")

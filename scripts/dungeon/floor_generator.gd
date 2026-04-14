@@ -53,6 +53,9 @@ func generate_floor() -> void:
 	# Portal spawner for B3F+
 	if GameManager.current_floor >= 3:
 		_spawn_portal()
+	# Blueprint drops — Scout blueprint on B4 (first visit only).
+	if GameManager.current_floor == 4 and not ("scout" in Inventory.blueprints):
+		_spawn_blueprint("scout", "Scout")
 
 
 # === Ore spawning ===
@@ -218,6 +221,15 @@ func _spawn_portal() -> void:
 	var portal: Node2D = portal_scene.instantiate()
 	portal.position = _reserve_position(80.0, 50.0)
 	entities.add_child(portal)
+
+
+func _spawn_blueprint(bot_id: String, display_name: String) -> void:
+	## Drop a walk-over blueprint pickup at a random free floor position.
+	var bp: Area2D = Area2D.new()
+	bp.set_script(load("res://scripts/dungeon/blueprint_pickup.gd"))
+	bp.position = _reserve_position(50.0, 40.0)
+	entities.add_child(bp)
+	bp.setup(bot_id, display_name)
 
 
 # === Enemy spawning (used by caves and floor wanderers) ===

@@ -104,6 +104,9 @@ func _on_touch_x() -> void:
 		return  # Already merged, X does nothing
 	if _backpack_open:
 		return  # Other panels open
+	if not Inventory.merge_unlocked:
+		_show_merge_warning("Merge locked — reach B5F first")
+		return
 	_open_merge_panel()
 
 
@@ -158,7 +161,10 @@ func _process(delta: float) -> void:
 			if _merge_panel_open:
 				_close_merge_panel()
 			elif not _merge_active and not _backpack_open:
-				_open_merge_panel()
+				if not Inventory.merge_unlocked:
+					_show_merge_warning("Merge locked — reach B5F first")
+				else:
+					_open_merge_panel()
 
 	# --- B button: pure cancel (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
@@ -896,6 +902,10 @@ func _on_floor_changed(floor_num: int) -> void:
 	full_warning.visible = false
 	if GameManager.is_checkpoint_floor(floor_num):
 		floor_label.text += " ★ CHECKPOINT"
+	# Merge unlock popup — shown once, after B5F reach.
+	if GameManager.merge_just_unlocked:
+		GameManager.merge_just_unlocked = false
+		_show_merge_warning("Merge Unlocked! Press X to transform.")
 
 
 func _on_health_changed(hp: float, max_hp: float, armor: float, max_armor: float) -> void:

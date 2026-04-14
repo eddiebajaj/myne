@@ -30,6 +30,9 @@ var merge_active: bool = false
 var merge_type: String = ""
 var merge_time_remaining: float = 0.0
 
+# --- Merge unlock popup flag (read + cleared by mining_hud after showing) ---
+var merge_just_unlocked: bool = false
+
 const CHECKPOINT_INTERVAL := 5
 const MAX_FLOOR := 20
 
@@ -68,6 +71,10 @@ func start_run(from_checkpoint: int = 0) -> void:
 	# Checkpoint warp restarts AT the checkpoint floor (B5, B10, ...), not the one after.
 	run_start_floor = from_checkpoint if from_checkpoint > 0 else 1
 	current_floor = run_start_floor
+	# Warping directly to a B5F+ checkpoint also counts as reaching it.
+	if current_floor >= 5 and not Inventory.merge_unlocked:
+		Inventory.merge_unlocked = true
+		merge_just_unlocked = true
 	Inventory.begin_run()
 	_reset_run_vitals()
 	get_tree().change_scene_to_file("res://scenes/dungeon/mining_floor.tscn")
@@ -85,6 +92,10 @@ func go_deeper() -> void:
 			deepest_checkpoint = current_floor
 		Inventory.save_checkpoint()
 		checkpoint_reached.emit(current_floor)
+	# Merge unlocks the first time the player reaches B5F, by any path.
+	if current_floor >= 5 and not Inventory.merge_unlocked:
+		Inventory.merge_unlocked = true
+		merge_just_unlocked = true
 	floor_changed.emit(current_floor)
 
 

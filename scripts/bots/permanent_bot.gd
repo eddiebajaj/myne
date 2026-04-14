@@ -88,9 +88,10 @@ func take_damage(amount: float, _damage_type: int = 0) -> void:
 	if health_bar:
 		health_bar.value = health
 	if sprite:
+		var base_color: Color = sprite.color
 		var tween := create_tween()
 		sprite.color = Color.RED
-		tween.tween_property(sprite, "color", Color(0.3, 0.9, 1.0), 0.2)
+		tween.tween_property(sprite, "color", base_color, 0.2)
 	_spawn_damage_number(amount, Color(1.0, 0.6, 0.0))
 	if health <= 0:
 		_destroy()

@@ -43,6 +43,13 @@ var merge_upgrade_level: int = 0     # 0 = starter (max 1). Max 3 (max 4).
 var mineral_storage: Array[MineralData] = []  # Lab-extracted minerals
 var blueprints: Array[String] = []            # Unlocked bot variant IDs
 
+# --- Ore storage shed (persistent across runs) ---
+const STORAGE_CAPACITY: int = 48
+var storage: Array[Dictionary] = []  # Same format as carried_ore: [{ore, mineral, quantity}]
+
+# --- Merge gating (unlocks on first B5F reach) ---
+var merge_unlocked: bool = false
+
 # --- Town upgrades ---
 var upgrade_levels: Dictionary = {
 	"pickaxe_tier": 1,       # 1-4
@@ -54,7 +61,13 @@ var upgrade_levels: Dictionary = {
 # === Grid Capacity ===
 
 func get_max_capacity() -> int:
-	return grid_width * (grid_height + upgrade_levels.get("grid_rows", 0))
+	var base: int = grid_width * (grid_height + upgrade_levels.get("grid_rows", 0))
+	# Backpack Bot passive: +8 slots while in run_party and alive
+	for entry in run_party:
+		if entry.get("id", "") == "backpack_bot" and not entry.get("knocked_out", false):
+			base += 8
+			break
+	return base
 
 
 func get_used_slots() -> int:
@@ -350,3 +363,115 @@ func apply_upgrade(upgrade_id: String, value) -> void:
 func _check_full() -> void:
 	if is_full():
 		backpack_full.emit()
+
+
+# === Storage Shed ===
+
+func get_storage_used() -> int:
+	var total: int = 0
+	for slot in storage:
+		total += int(slot.get("quantity", 0))
+	return total
+
+
+func get_storage_remaining() -> int:
+	return STORAGE_CAPACITY - get_storage_used()
+
+
+func _storage_add(ore: OreData, mineral: MineralData, quantity: int) -> int:
+	## Adds up to [quantity] pieces to storage, respecting capacity. Returns count added.
+	var can_add: int = mini(quantity, get_storage_remaining())
+	if can_add <= 0:
+		return 0
+	var key: String = _get_slot_key(ore, mineral)
+	for slot in storage:
+		if _get_slot_key(slot.ore, slot.mineral) == key:
+			slot.quantity += can_add
+			return can_add
+	storage.append({"ore": ore, "mineral": mineral, "quantity": can_add})
+	return can_add
+
+
+func deposit_all_to_storage() -> int:
+	## Moves everything from backpack to storage (within capacity).
+	## Returns number of pieces moved.
+	var moved: int = 0
+	var i: int = 0
+	while i < carried_ore.size():
+		var slot: Dictionary = carried_ore[i]
+		var qty: int = int(slot.quantity)
+		var added: int = _storage_add(slot.ore, slot.mineral, qty)
+		moved += added
+		slot.quantity -= added
+		if int(slot.quantity) <= 0:
+			carried_ore.remove_at(i)
+		else:
+			i += 1
+		if get_storage_remaining() <= 0:
+			break
+	if moved > 0:
+		inventory_changed.emit()
+	return moved
+
+
+func withdraw_one_from_storage(ore_id: String, mineral_id: String) -> bool:
+	## Moves 1 piece from storage to backpack if backpack has space.
+	if get_remaining_slots() <= 0:
+		return false
+	var key: String = ore_id
+	if mineral_id != "":
+		key = ore_id + ":" + mineral_id
+	for i in range(storage.size()):
+		var slot: Dictionary = storage[i]
+		if _get_slot_key(slot.ore, slot.mineral) == key and int(slot.quantity) >= 1:
+			if not add_ore(slot.ore, slot.mineral, 1):
+				return false
+			slot.quantity -= 1
+			if int(slot.quantity) <= 0:
+				storage.remove_at(i)
+			inventory_changed.emit()
+			return true
+	return false
+
+
+func get_storage_stacks() -> Array[Dictionary]:
+	return storage
+
+
+func count_plain_t1_ore_combined() -> int:
+	## Backpack + storage total of plain T1 ore.
+	var total: int = count_plain_t1_ore()
+	for slot in storage:
+		if slot.mineral == null and slot.ore.tier == 1:
+			total += int(slot.quantity)
+	return total
+
+
+func spend_plain_t1_ore_from_any(amount: int) -> bool:
+	## Spends plain T1 ore from storage first, then backpack.
+	if count_plain_t1_ore_combined() < amount:
+		return false
+	var remaining: int = amount
+	# Spend from storage first (smallest stacks first, for consistency).
+	var storage_plain: Array[Dictionary] = []
+	for slot in storage:
+		if slot.mineral == null and slot.ore.tier == 1:
+			storage_plain.append(slot)
+	storage_plain.sort_custom(func(a, b): return int(a.quantity) < int(b.quantity))
+	for slot in storage_plain:
+		if remaining <= 0:
+			break
+		var take: int = mini(int(slot.quantity), remaining)
+		slot.quantity -= take
+		remaining -= take
+	var i: int = storage.size() - 1
+	while i >= 0:
+		if int(storage[i].quantity) <= 0:
+			storage.remove_at(i)
+		i -= 1
+	# Then backpack for any leftover.
+	if remaining > 0:
+		if not spend_plain_t1_ore(remaining):
+			return false
+	inventory_changed.emit()
+	return true

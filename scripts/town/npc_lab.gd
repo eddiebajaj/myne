@@ -9,12 +9,24 @@ extends Area2D
 
 enum LabView { MAIN, BUILD_BOT, UPGRADE_BOTS, UPGRADE_NECKLACE, UPGRADE_MERGE }
 
-# --- Scout blueprint cost ---
-const SCOUT_ORE_COST := 20
-const SCOUT_GOLD_COST := 100
-const SCOUT_BASE_HP := 40.0
-const SCOUT_BASE_DAMAGE := 5.0
-const SCOUT_CP_COST := 1
+# --- Bot build costs (Sprint 5 Round 2: uniform 10 ore, no gold) ---
+const BOT_BUILD_ORE_COST := 10
+const BOT_BUILD_GOLD_COST := 0
+
+# Starter bots — always available (no blueprint required).
+const STARTER_BOTS: Array[String] = ["miner", "striker", "backpack_bot"]
+
+# Build stats per bot id. Keep in sync with mining_floor_controller._spawn_permanent_bot.
+const BOT_BUILD_SPECS: Dictionary = {
+	"miner":        {"display_name": "Miner",        "hp": 20.0, "damage": 0.0, "cp_cost": 1,
+	                "desc": "Auto-mines ore. 20 HP, 0 DMG."},
+	"striker":      {"display_name": "Striker",      "hp": 25.0, "damage": 8.0, "cp_cost": 1,
+	                "desc": "Melee glass cannon. 25 HP, 8 DMG."},
+	"backpack_bot": {"display_name": "Backpack Bot", "hp": 15.0, "damage": 0.0, "cp_cost": 1,
+	                "desc": "+8 backpack slots. 15 HP, 0 DMG."},
+	"scout":        {"display_name": "Scout",        "hp": 40.0, "damage": 5.0, "cp_cost": 1,
+	                "desc": "Ranged combat support. 40 HP, 5 DMG."},
+}
 
 # --- Bot upgrade scaling ---
 const BOT_UPGRADE_BASE_ORE := 15
@@ -182,50 +194,65 @@ func _build_main_view() -> void:
 func _build_build_bot_view() -> void:
 	_add_header("— BUILD BOT —")
 
-	var plain_t1: int = Inventory.count_plain_t1_ore()
+	var plain_t1: int = Inventory.count_plain_t1_ore_combined()
 	var have_lbl: Label = Label.new()
-	have_lbl.text = "Have: %d plain T1 ore, %dg" % [plain_t1, GameManager.gold]
+	have_lbl.text = "Have: %d plain T1 ore (backpack+storage), %dg" % [plain_t1, GameManager.gold]
 	services_container.add_child(have_lbl)
 
-	# Scout blueprint (the only one for now).
-	var scout_row: HBoxContainer = HBoxContainer.new()
-	var scout_info: Label = Label.new()
-	if Inventory.has_permanent_bot("scout"):
-		scout_info.text = "Scout — already owned"
-		scout_info.add_theme_color_override("font_color", Color(0.6, 0.9, 0.6))
-		services_container.add_child(scout_info)
-	else:
-		scout_info.text = "Scout (CP %d) — cost: %d plain T1 ore + %dg" % [
-			SCOUT_CP_COST, SCOUT_ORE_COST, SCOUT_GOLD_COST,
-		]
-		services_container.add_child(scout_info)
-		var buy_btn: Button = Button.new()
-		buy_btn.text = "Build Scout"
-		buy_btn.disabled = plain_t1 < SCOUT_ORE_COST or GameManager.gold < SCOUT_GOLD_COST
-		buy_btn.pressed.connect(_on_build_scout)
-		services_container.add_child(buy_btn)
+	# Build list of available bot ids: starters + any blueprints.
+	var available: Array[String] = []
+	for id in STARTER_BOTS:
+		available.append(id)
+	if "scout" in Inventory.blueprints and not ("scout" in available):
+		available.append("scout")
+
+	for id in available:
+		var spec: Dictionary = BOT_BUILD_SPECS.get(id, {})
+		if spec.is_empty():
+			continue
+		var dname: String = spec.get("display_name", id.capitalize())
+		var desc: String = spec.get("desc", "")
+		var info: Label = Label.new()
+		if Inventory.has_permanent_bot(id):
+			info.text = "%s — Owned  (%s)" % [dname, desc]
+			info.add_theme_color_override("font_color", Color(0.6, 0.9, 0.6))
+			services_container.add_child(info)
+		else:
+			info.text = "%s — cost: %d plain T1 ore  (%s)" % [dname, BOT_BUILD_ORE_COST, desc]
+			services_container.add_child(info)
+			var buy_btn: Button = Button.new()
+			buy_btn.text = "Build %s" % dname
+			buy_btn.disabled = plain_t1 < BOT_BUILD_ORE_COST
+			var id_cap: String = id
+			buy_btn.pressed.connect(func(): _on_build_bot(id_cap))
+			services_container.add_child(buy_btn)
 
 	_add_back_button()
 
 
-func _on_build_scout() -> void:
-	if Inventory.has_permanent_bot("scout"):
+func _on_build_bot(id: String) -> void:
+	if Inventory.has_permanent_bot(id):
 		return
-	if Inventory.count_plain_t1_ore() < SCOUT_ORE_COST:
+	var spec: Dictionary = BOT_BUILD_SPECS.get(id, {})
+	if spec.is_empty():
+		result_label.text = "Unknown bot."
+		return
+	# Gate: starters always buildable; non-starters require blueprint.
+	if not (id in STARTER_BOTS) and not (id in Inventory.blueprints):
+		result_label.text = "Blueprint required."
+		return
+	if Inventory.count_plain_t1_ore_combined() < BOT_BUILD_ORE_COST:
 		result_label.text = "Not enough plain T1 ore."
 		return
-	if GameManager.gold < SCOUT_GOLD_COST:
-		result_label.text = "Not enough gold."
-		return
-	if not Inventory.spend_plain_t1_ore(SCOUT_ORE_COST):
+	if not Inventory.spend_plain_t1_ore_from_any(BOT_BUILD_ORE_COST):
 		result_label.text = "Could not spend ore."
 		return
-	if not GameManager.spend_gold(SCOUT_GOLD_COST):
-		# Refund scenario: unlikely but guard anyway.
-		result_label.text = "Could not spend gold."
-		return
-	Inventory.unlock_permanent_bot("scout", "Scout", SCOUT_BASE_HP, SCOUT_BASE_DAMAGE, SCOUT_CP_COST)
-	result_label.text = "Built Scout!"
+	var dname: String = spec.get("display_name", id.capitalize())
+	var hp: float = float(spec.get("hp", 40.0))
+	var dmg: float = float(spec.get("damage", 5.0))
+	var cp_cost: int = int(spec.get("cp_cost", 1))
+	Inventory.unlock_permanent_bot(id, dname, hp, dmg, cp_cost)
+	result_label.text = "Built %s!" % dname
 	_show_view(LabView.BUILD_BOT)
 
 
@@ -240,7 +267,7 @@ func _build_upgrade_bots_view() -> void:
 		_add_back_button()
 		return
 
-	var plain_t1: int = Inventory.count_plain_t1_ore()
+	var plain_t1: int = Inventory.count_plain_t1_ore_combined()
 	var have_lbl: Label = Label.new()
 	have_lbl.text = "Have: %d plain T1 ore, %dg" % [plain_t1, GameManager.gold]
 	services_container.add_child(have_lbl)
@@ -346,7 +373,7 @@ func _build_upgrade_necklace_view() -> void:
 	info.text = "Crystal Power: %d (level %d/%d)" % [current, lvl, NECKLACE_MAX_LEVEL]
 	services_container.add_child(info)
 
-	var plain_t1: int = Inventory.count_plain_t1_ore()
+	var plain_t1: int = Inventory.count_plain_t1_ore_combined()
 	var have_lbl: Label = Label.new()
 	have_lbl.text = "Have: %d plain T1 ore, %dg" % [plain_t1, GameManager.gold]
 	services_container.add_child(have_lbl)
@@ -397,7 +424,7 @@ func _build_upgrade_merge_view() -> void:
 	info.text = "Merge charges per run: %d (level %d/%d)" % [current, lvl, MERGE_MAX_LEVEL]
 	services_container.add_child(info)
 
-	var plain_t1: int = Inventory.count_plain_t1_ore()
+	var plain_t1: int = Inventory.count_plain_t1_ore_combined()
 	var have_lbl: Label = Label.new()
 	have_lbl.text = "Have: %d plain T1 ore, %dg" % [plain_t1, GameManager.gold]
 	services_container.add_child(have_lbl)
@@ -443,13 +470,13 @@ func _on_upgrade_merge() -> void:
 # ── Helpers ─────────────────────────────────────────────────────────
 
 func _pay(ore_amount: int, gold_amount: int) -> bool:
-	if Inventory.count_plain_t1_ore() < ore_amount:
+	if Inventory.count_plain_t1_ore_combined() < ore_amount:
 		result_label.text = "Not enough plain T1 ore."
 		return false
 	if GameManager.gold < gold_amount:
 		result_label.text = "Not enough gold."
 		return false
-	if not Inventory.spend_plain_t1_ore(ore_amount):
+	if not Inventory.spend_plain_t1_ore_from_any(ore_amount):
 		result_label.text = "Failed to spend ore."
 		return false
 	if not GameManager.spend_gold(gold_amount):
