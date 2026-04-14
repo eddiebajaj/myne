@@ -57,10 +57,9 @@ func _spawn_treasure(pos: Vector2) -> void:
 				if ore and Inventory.can_add_ore(ore):
 					Inventory.add_ore(ore)
 	elif roll < 0.85:
-		# 25%: Battery
-		Inventory.add_batteries(1)
-		# Show floating text
-		_show_pickup_text(pos, "+1 Battery!")
+		# 25%: Small gold drop (replaces former battery drop — Sprint 5 economy rework)
+		GameManager.add_gold(5)
+		_show_pickup_text(pos, "+5 gold")
 	# else 15%: nothing special
 
 

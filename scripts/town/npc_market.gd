@@ -37,7 +37,10 @@ func _ready() -> void:
 	var menu_layer: CanvasLayer = $CanvasLayer
 	menu_layer.process_mode = Node.PROCESS_MODE_ALWAYS
 	sell_button.pressed.connect(_on_sell)
-	buy_battery_button.pressed.connect(_on_buy_battery)
+	# Sprint 5: battery economy removed. Hide the Buy Battery button + battery label.
+	buy_battery_button.visible = false
+	buy_battery_button.disabled = true
+	battery_label.visible = false
 	close_button.pressed.connect(_close_menu)
 	# Allow _process to run while paused so B-button can close the menu.
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -120,20 +123,8 @@ func _spawn_gold_popup(amount: int) -> void:
 	tween.chain().tween_callback(popup.queue_free)
 
 
-func _on_buy_battery() -> void:
-	if GameManager.spend_gold(BATTERY_PRICE):
-		Inventory.add_batteries(1)
-		result_label.text = "Bought 1 battery!"
-	else:
-		result_label.text = "Not enough gold!"
-	_refresh_ui()
-
-
 func _refresh_ui() -> void:
 	gold_label.text = "Gold: %d" % GameManager.gold
-	battery_label.text = "Batteries: %d" % Inventory.batteries
-	buy_battery_button.text = "Buy Battery (%d gold)" % BATTERY_PRICE
-	buy_battery_button.disabled = GameManager.gold < BATTERY_PRICE
 	_refresh_breakdown()
 
 

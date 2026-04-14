@@ -1,5 +1,5 @@
 extends Control
-## In-mine HUD — floor, HP+armor, backpack, batteries, build menu, artifacts.
+## In-mine HUD — floor, HP+armor, backpack, merge charges, artifacts.
 
 @onready var floor_label: Label = %FloorLabel
 @onready var backpack_bar: ProgressBar = %BackpackBar
@@ -7,19 +7,16 @@ extends Control
 @onready var health_bar: ProgressBar = %HealthBar
 @onready var health_label: Label = %HealthLabel
 @onready var armor_label: Label = %ArmorLabel
-@onready var battery_label: Label = %BatteryLabel
+@onready var battery_label: Label = %BatteryLabel  # Repurposed: shows merge charges
 @onready var artifact_label: Label = %ArtifactLabel
 @onready var full_warning: Label = %FullWarning
-@onready var build_panel: PanelContainer = %BuildPanel
-@onready var build_list: VBoxContainer = %BuildList
+@onready var build_panel: PanelContainer = %BuildPanel  # Legacy node, kept hidden
 @onready var backpack_container: PanelContainer = %BackpackContainer
 @onready var merge_panel: PanelContainer = %MergePanel
 
-var bot_placer: BotPlacer = null
-var build_step: int = 0  # 0=closed, 1=pick bot, 2=pick ore
-var selected_bot: BotData = null
-var cancel_placement_btn: Button = null
-var _touch_b_handled_frame: int = -1  # Frame guard: signal already toggled build menu
+const MERGE_COOLDOWN_SECONDS := 30.0
+
+var _touch_b_handled_frame: int = -1  # Frame guard for B-button double-fire
 
 # ── Backpack state (fully owned by mining_hud, no autoload needed) ──
 # ── Merge state ──
@@ -31,6 +28,7 @@ var _merge_list: VBoxContainer = null
 var _merge_timer_bar: ProgressBar = null
 var _merge_timer_label: Label = null
 var _merge_timer_max: float = 15.0
+var _merge_cooldown_timer: float = 0.0  # Seconds remaining before next merge allowed
 var _player_ref: Player = null
 var _touch_x_handled_frame: int = -1
 
@@ -38,7 +36,7 @@ var _backpack_open: bool = false
 var _bp_grid: GridContainer = null
 var _bp_capacity_label: Label = null
 var _bp_gold_label: Label = null
-var _bp_battery_label: Label = null
+var _bp_battery_label: Label = null  # Repurposed: merge charge readout inside backpack
 var _bp_followers_header: Label = null
 var _bp_followers_list: VBoxContainer = null
 
@@ -76,54 +74,7 @@ func _ready() -> void:
 		_restore_merge_from_gm()
 
 
-# ── Bot placer / Cancel button ──────────────────────────────────────
-
-func set_bot_placer(placer: BotPlacer) -> void:
-	bot_placer = placer
-	placer.placement_started.connect(_on_placement_started)
-	placer.bot_built.connect(func(_bd, _tier, _mineral): _hide_cancel_button())
-	placer.build_cancelled.connect(_hide_cancel_button)
-	_ensure_cancel_button()
-
-
-func _ensure_cancel_button() -> void:
-	if cancel_placement_btn != null:
-		return
-	cancel_placement_btn = Button.new()
-	cancel_placement_btn.text = "Cancel Placement"
-	cancel_placement_btn.visible = false
-	cancel_placement_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	cancel_placement_btn.process_mode = Node.PROCESS_MODE_ALWAYS
-	cancel_placement_btn.anchor_left = 0.5
-	cancel_placement_btn.anchor_right = 0.5
-	cancel_placement_btn.anchor_top = 1.0
-	cancel_placement_btn.anchor_bottom = 1.0
-	cancel_placement_btn.offset_left = -90.0
-	cancel_placement_btn.offset_right = 90.0
-	cancel_placement_btn.offset_top = -80.0
-	cancel_placement_btn.offset_bottom = -40.0
-	cancel_placement_btn.pressed.connect(func():
-		if bot_placer:
-			bot_placer._cancel_placement()
-	)
-	add_child(cancel_placement_btn)
-
-
-func _on_placement_started(_bot_data: BotData) -> void:
-	if cancel_placement_btn:
-		cancel_placement_btn.visible = true
-	if full_warning:
-		full_warning.text = "Walk to position bot, tap A to place"
-		full_warning.visible = true
-
-
-func _hide_cancel_button() -> void:
-	if cancel_placement_btn:
-		cancel_placement_btn.visible = false
-	if full_warning:
-		full_warning.text = "BACKPACK FULL! Return to town!"
-		full_warning.visible = false
-
+# ── Player hookup ───────────────────────────────────────────────────
 
 func set_player(player: Player) -> void:
 	_player_ref = player
@@ -134,6 +85,7 @@ func set_player(player: Player) -> void:
 # ── Touch / keyboard input routing ──────────────────────────────────
 
 func _on_touch_b() -> void:
+	# Sprint 5: B is pure cancel. Closes any open panel, otherwise does nothing.
 	_touch_b_handled_frame = Engine.get_process_frames()
 	if _merge_panel_open:
 		_close_merge_panel()
@@ -141,14 +93,6 @@ func _on_touch_b() -> void:
 	if _backpack_open:
 		_close_backpack()
 		return
-	if bot_placer and bot_placer.placing:
-		return
-	if build_panel.visible:
-		_close_build_menu()
-	else:
-		if _merge_active:
-			return  # Can't open build menu while merged
-		_open_build_step1()
 
 
 func _on_touch_x() -> void:
@@ -158,10 +102,8 @@ func _on_touch_x() -> void:
 		return
 	if _merge_active:
 		return  # Already merged, X does nothing
-	if _backpack_open or build_panel.visible:
+	if _backpack_open:
 		return  # Other panels open
-	if bot_placer and bot_placer.placing:
-		return
 	_open_merge_panel()
 
 
@@ -170,15 +112,11 @@ func _on_touch_y() -> void:
 	if _merge_panel_open:
 		_close_merge_panel()
 		return
-	# Close build menu first if it's open (mutual exclusion)
-	if build_panel.visible:
-		_close_build_menu()
-		return
 	if _backpack_open:
 		_close_backpack()
 	else:
 		_open_backpack()
-		# Set B guard so _process can't open build menu on same frame
+		# Set B guard so _process can't re-trigger on same frame
 		_touch_b_handled_frame = Engine.get_process_frames()
 
 
@@ -186,9 +124,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Consume toggle_backpack (Tab) here so the BackpackPanel autoload
 	# (which has broken @onready refs in-mine) never receives it.
 	if event.is_action_pressed("toggle_backpack"):
-		if build_panel.visible:
-			_close_build_menu()
-		elif _backpack_open:
+		if _backpack_open:
 			_close_backpack()
 		else:
 			_open_backpack()
@@ -211,35 +147,31 @@ func _process(delta: float) -> void:
 		# Persist to GameManager for floor transitions
 		GameManager.merge_time_remaining = _merge_timer
 
+	# --- Merge cooldown (runs even while paused is false; _process respects pause) ---
+	if _merge_cooldown_timer > 0.0:
+		_merge_cooldown_timer = maxf(0.0, _merge_cooldown_timer - delta)
+		_update_extras()
+
 	# --- X button: merge panel toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_x"):
 		if _touch_x_handled_frame != Engine.get_process_frames():
 			if _merge_panel_open:
 				_close_merge_panel()
-			elif not _merge_active and not _backpack_open and not build_panel.visible:
-				if not (bot_placer and bot_placer.placing):
-					_open_merge_panel()
+			elif not _merge_active and not _backpack_open:
+				_open_merge_panel()
 
-	# --- B button: build menu toggle (keyboard fallback) ---
+	# --- B button: pure cancel (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_b") or Input.is_action_just_pressed("build_menu"):
 		if _touch_b_handled_frame != Engine.get_process_frames():
 			if _merge_panel_open:
 				_close_merge_panel()
 			elif _backpack_open:
 				_close_backpack()
-			elif bot_placer and bot_placer.placing:
-				pass
-			elif build_panel.visible:
-				_close_build_menu()
-			elif not _merge_active:
-				_open_build_step1()
 
 	# --- Y button: backpack toggle (keyboard fallback) ---
 	if Input.is_action_just_pressed("action_y"):
 		if _merge_panel_open:
 			_close_merge_panel()
-		elif build_panel.visible:
-			_close_build_menu()
 		elif _backpack_open:
 			_close_backpack()
 		else:
@@ -321,7 +253,7 @@ func _build_backpack_ui() -> void:
 	side.add_child(_bp_gold_label)
 
 	_bp_battery_label = Label.new()
-	_bp_battery_label.text = "Batteries: 0"
+	_bp_battery_label.text = "Merge: 0/0"
 	side.add_child(_bp_battery_label)
 
 	_bp_followers_header = Label.new()
@@ -607,7 +539,7 @@ func _close_inspect_popup() -> void:
 
 func _refresh_bp_side() -> void:
 	_bp_gold_label.text = "Gold: %d" % GameManager.gold
-	_bp_battery_label.text = "Batteries: %d" % Inventory.batteries
+	_bp_battery_label.text = "Merge: %d/%d" % [Inventory.merge_charges, Inventory.merge_charges_max]
 	for child in _bp_followers_list.get_children():
 		child.queue_free()
 	_bp_followers_header.text = "FOLLOWERS"
@@ -656,99 +588,7 @@ func _refresh_bp_side() -> void:
 		_bp_followers_list.add_child(empty)
 
 
-# ── Build menu ──────────────────────────────────────────────────────
-
-func _open_build_step1() -> void:
-	if _merge_active:
-		return  # Can't open build menu while merged
-	_close_backpack()
-	_close_merge_panel()
-	build_step = 1
-	selected_bot = null
-	build_panel.visible = true
-	get_tree().paused = true
-	_rebuild_bot_list()
-	_focus_first_build_button()
-
-
-func _open_build_step2(bot: BotData) -> void:
-	build_step = 2
-	selected_bot = bot
-	_rebuild_ore_list()
-	_focus_first_build_button()
-
-
-func _close_build_menu() -> void:
-	build_panel.visible = false
-	build_step = 0
-	selected_bot = null
-	get_tree().paused = false
-
-
-func _focus_first_build_button() -> void:
-	for child in build_list.get_children():
-		if child is Button:
-			child.grab_focus()
-			return
-
-
-func _rebuild_bot_list() -> void:
-	for child in build_list.get_children():
-		child.queue_free()
-	if bot_placer == null:
-		return
-	var header := Label.new()
-	header.text = "SELECT BOT TYPE"
-	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	build_list.add_child(header)
-	for bot_data in bot_placer.get_bot_defs():
-		var type_label := "STATIC" if bot_data.category == BotData.BotCategory.STATIC else "FOLLOW"
-		var btn := Button.new()
-		btn.text = "%s [%s] — %d ore + 1 battery\n%s" % [bot_data.display_name, type_label, bot_data.ore_count, bot_data.description]
-		btn.disabled = Inventory.batteries <= 0
-		var bd := bot_data
-		btn.pressed.connect(func(): _open_build_step2(bd))
-		build_list.add_child(btn)
-	var cancel := Button.new()
-	cancel.text = "Cancel"
-	cancel.pressed.connect(_close_build_menu)
-	build_list.add_child(cancel)
-
-
-func _rebuild_ore_list() -> void:
-	for child in build_list.get_children():
-		child.queue_free()
-	if selected_bot == null:
-		return
-	var header := Label.new()
-	header.text = "SELECT ORE FOR %s (need %d)" % [selected_bot.display_name.to_upper(), selected_bot.ore_count]
-	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	build_list.add_child(header)
-	for slot in Inventory.get_ore_stacks():
-		var ore_name: String = slot.ore.display_name
-		var mineral_id := ""
-		if slot.mineral:
-			ore_name += " (%s)" % slot.mineral.display_name
-			mineral_id = slot.mineral.id
-		var can_afford: bool = slot.quantity >= selected_bot.ore_count
-		var tier_info: String = "T%d" % slot.ore.tier
-		var btn := Button.new()
-		btn.text = "%s %s x%d — Bot stats x%.1f" % [tier_info, ore_name, slot.quantity, BotData.get_tier_mult(slot.ore.tier)]
-		if slot.mineral:
-			btn.text += " + %s effect" % slot.mineral.display_name
-		btn.disabled = not can_afford
-		var oid: String = slot.ore.id
-		var mid := mineral_id
-		var bot := selected_bot
-		btn.pressed.connect(func():
-			_close_build_menu()
-			bot_placer.select_bot_and_ore(bot, oid, mid)
-		)
-		build_list.add_child(btn)
-	var back := Button.new()
-	back.text = "← Back"
-	back.pressed.connect(func(): _open_build_step1())
-	build_list.add_child(back)
+# ── Build menu removed in Sprint 5 (bots are built at the Lab in town) ──
 
 
 # ── Merge panel ─────────────────────────────────────────────────────
@@ -826,19 +666,31 @@ func _populate_merge_list() -> void:
 	sep1.custom_minimum_size = Vector2(0, 4)
 	_merge_list.add_child(sep1)
 
+	var cooldown_active: bool = _merge_cooldown_timer > 0.0
+	var no_charges: bool = Inventory.merge_charges <= 0
+	var charges_line: String = "Charges: %d/%d" % [Inventory.merge_charges, Inventory.merge_charges_max]
+	if cooldown_active:
+		charges_line += "    Cooldown: %.0fs" % _merge_cooldown_timer
+	var info_lbl := Label.new()
+	info_lbl.text = charges_line
+	info_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_merge_list.add_child(info_lbl)
+
 	# Upper Body button
 	var upper_btn := Button.new()
-	upper_btn.text = "Upper Body — Crystal Shots\nRapid-fire, +8 damage, 180px range\nDuration: %.0fs | Cost: 1 battery" % _get_merge_duration()
+	upper_btn.text = "Upper Body — Crystal Shots\nRapid-fire, +8 damage, 180px range\nDuration: %.0fs | Cost: 1 charge" % _get_merge_duration()
 	upper_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	upper_btn.custom_minimum_size = Vector2(0, 70)
+	upper_btn.disabled = cooldown_active or no_charges
 	upper_btn.pressed.connect(func(): _execute_merge("upper"))
 	_merge_list.add_child(upper_btn)
 
 	# Lower Body button
 	var lower_btn := Button.new()
-	lower_btn.text = "Lower Body — Crystal Dash\n350 speed, +5 armor, doubled dodge\nDuration: %.0fs | Cost: 1 battery" % _get_merge_duration()
+	lower_btn.text = "Lower Body — Crystal Dash\n350 speed, +5 armor, doubled dodge\nDuration: %.0fs | Cost: 1 charge" % _get_merge_duration()
 	lower_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	lower_btn.custom_minimum_size = Vector2(0, 70)
+	lower_btn.disabled = cooldown_active or no_charges
 	lower_btn.pressed.connect(func(): _execute_merge("lower"))
 	_merge_list.add_child(lower_btn)
 
@@ -857,7 +709,6 @@ func _open_merge_panel() -> void:
 	if _merge_panel_open or _merge_active:
 		return
 	_close_backpack()
-	_close_build_menu()
 	_merge_panel_open = true
 	merge_panel.visible = true
 	get_tree().paused = true
@@ -880,7 +731,7 @@ func _get_merge_duration() -> float:
 func _execute_merge(type: String) -> void:
 	_close_merge_panel()
 
-	# Check: Scout alive + batteries > 0
+	# Check: Scout alive + merge charges available + cooldown clear
 	var scout_alive := false
 	for entry in Inventory.run_party:
 		if entry.get("id", "") == "scout" and not entry.get("knocked_out", false):
@@ -890,12 +741,17 @@ func _execute_merge(type: String) -> void:
 	if not scout_alive:
 		_show_merge_warning("Scout is knocked out!")
 		return
-	if Inventory.batteries <= 0:
-		_show_merge_warning("No batteries!")
+	if _merge_cooldown_timer > 0.0:
+		_show_merge_warning("Merge on cooldown (%.0fs)" % _merge_cooldown_timer)
+		return
+	if Inventory.merge_charges <= 0:
+		_show_merge_warning("No merge charges!")
 		return
 
-	# Consume 1 battery
-	Inventory.use_battery()
+	# Consume 1 merge charge
+	if not Inventory.use_merge_charge():
+		_show_merge_warning("No merge charges!")
+		return
 	_update_extras()
 
 	# Find and remove Scout from the floor
@@ -949,6 +805,10 @@ func _end_merge() -> void:
 	GameManager.merge_time_remaining = 0.0
 
 	_merge_type = ""
+
+	# Start cooldown before next merge is allowed
+	_merge_cooldown_timer = MERGE_COOLDOWN_SECONDS
+	_update_extras()
 
 
 func _respawn_scout_after_merge() -> void:
@@ -1050,7 +910,10 @@ func _on_health_changed(hp: float, max_hp: float, armor: float, max_armor: float
 
 
 func _update_extras() -> void:
-	battery_label.text = "Batteries: %d" % Inventory.batteries
+	var merge_txt := "Merge: %d/%d" % [Inventory.merge_charges, Inventory.merge_charges_max]
+	if _merge_cooldown_timer > 0.0:
+		merge_txt += "  (ready in %.0fs)" % _merge_cooldown_timer
+	battery_label.text = merge_txt
 	if Inventory.artifacts.is_empty():
 		artifact_label.visible = false
 	else:

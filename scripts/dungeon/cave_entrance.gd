@@ -283,7 +283,8 @@ func _collect_loot(loot: Dictionary) -> void:
 		"mineral_core":
 			Inventory.store_mineral(loot.mineral)
 		"battery":
-			Inventory.add_batteries(loot.get("count", 1))
+			# Sprint 5: batteries removed. Convert legacy battery loot into a small gold reward.
+			GameManager.add_gold(10 * int(loot.get("count", 1)))
 		"artifact":
 			Inventory.add_artifact(loot.id)
 		"equipment":

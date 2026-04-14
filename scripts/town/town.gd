@@ -17,7 +17,7 @@ var mine_panel_open: bool = false
 var selected_checkpoint: int = 0
 var _touch_b_handled_frame: int = -1
 var town_gold_label: Label = null
-var town_battery_label: Label = null
+var town_cp_label: Label = null
 
 # Mine entrance panel (built programmatically in _build_mine_panel).
 var mine_panel_layer: CanvasLayer = null
@@ -26,6 +26,12 @@ var mine_panel: PanelContainer = null
 var mine_panel_options: VBoxContainer = null
 var mine_panel_enter_button: Button = null
 var mine_panel_option_buttons: Array[Button] = []
+
+# Party selection at mine entrance.
+var mine_panel_party_container: VBoxContainer = null
+var mine_panel_party_summary: Label = null
+var _party_selection: Dictionary = {}   # bot_id -> bool (selected)
+var _party_cp_used: int = 0
 
 
 func _ready() -> void:
@@ -56,11 +62,6 @@ func _ready() -> void:
 		touch.action_a_pressed.connect(_on_touch_a)
 		touch.action_b_pressed.connect(_on_touch_b)
 	_refresh_stats()
-	# Show Scout unlock notification if just unlocked
-	if GameManager._scout_just_unlocked and not GameManager.scout_unlocked_notified:
-		GameManager._scout_just_unlocked = false
-		GameManager.scout_unlocked_notified = true
-		_show_scout_unlock_popup()
 
 
 func _build_town_hud() -> void:
@@ -71,13 +72,13 @@ func _build_town_hud() -> void:
 	hbox.size = Vector2(264.0, 32.0)
 	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_root.add_child(hbox)
-	town_battery_label = Label.new()
-	town_battery_label.text = "Bat x 0"
-	town_battery_label.add_theme_font_size_override("font_size", 24)
-	town_battery_label.add_theme_color_override("font_color", Color(1, 1, 1))
-	town_battery_label.add_theme_constant_override("outline_size", 2)
-	town_battery_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
-	hbox.add_child(town_battery_label)
+	town_cp_label = Label.new()
+	town_cp_label.text = "CP 1"
+	town_cp_label.add_theme_font_size_override("font_size", 24)
+	town_cp_label.add_theme_color_override("font_color", Color(0.6, 0.9, 1.0))
+	town_cp_label.add_theme_constant_override("outline_size", 2)
+	town_cp_label.add_theme_color_override("font_outline_color", Color(0, 0, 0))
+	hbox.add_child(town_cp_label)
 	var spacer: Control = Control.new()
 	spacer.custom_minimum_size = Vector2(16, 0)
 	hbox.add_child(spacer)
@@ -143,6 +144,21 @@ func _build_mine_panel() -> void:
 	mine_panel_options.add_theme_constant_override("separation", 4)
 	vbox.add_child(mine_panel_options)
 
+	var sep_party: HSeparator = HSeparator.new()
+	vbox.add_child(sep_party)
+
+	var party_header: Label = Label.new()
+	party_header.text = "Select party (Crystal Power):"
+	vbox.add_child(party_header)
+
+	mine_panel_party_summary = Label.new()
+	mine_panel_party_summary.text = "CP 0 / 1"
+	vbox.add_child(mine_panel_party_summary)
+
+	mine_panel_party_container = VBoxContainer.new()
+	mine_panel_party_container.add_theme_constant_override("separation", 4)
+	vbox.add_child(mine_panel_party_container)
+
 	var sep2: HSeparator = HSeparator.new()
 	vbox.add_child(sep2)
 
@@ -164,10 +180,10 @@ func _build_mine_panel() -> void:
 
 	# Reposition to center after it's had a layout pass.
 	mine_panel.pivot_offset = mine_panel.size / 2.0
-	mine_panel.offset_left = -220
-	mine_panel.offset_top = -200
-	mine_panel.offset_right = 220
-	mine_panel.offset_bottom = 200
+	mine_panel.offset_left = -240
+	mine_panel.offset_top = -260
+	mine_panel.offset_right = 240
+	mine_panel.offset_bottom = 260
 
 
 func _refresh_mine_panel_options() -> void:
@@ -209,6 +225,8 @@ func _open_mine_panel() -> void:
 		return
 	mine_panel_open = true
 	_refresh_mine_panel_options()
+	_init_party_selection_default()
+	_refresh_mine_panel_party()
 	mine_panel.visible = true
 	mine_panel_dim.visible = true
 	get_tree().paused = true
@@ -217,6 +235,98 @@ func _open_mine_panel() -> void:
 		mine_panel_option_buttons[0].grab_focus()
 	elif mine_panel_enter_button:
 		mine_panel_enter_button.grab_focus()
+
+
+func _init_party_selection_default() -> void:
+	## Auto-select all affordable bots within CP budget; unselected after budget fills.
+	_party_selection.clear()
+	var cp_used := 0
+	for bot in Inventory.permanent_bots:
+		var id: String = bot.get("id", "")
+		var cost: int = int(bot.get("cp_cost", 1))
+		var knocked_out: bool = bot.get("knocked_out", false)
+		if not knocked_out and cp_used + cost <= Inventory.crystal_power_capacity:
+			_party_selection[id] = true
+			cp_used += cost
+		else:
+			_party_selection[id] = false
+	_party_cp_used = cp_used
+
+
+func _refresh_mine_panel_party() -> void:
+	if mine_panel_party_container == null:
+		return
+	for child in mine_panel_party_container.get_children():
+		child.queue_free()
+	if Inventory.permanent_bots.is_empty():
+		var empty: Label = Label.new()
+		empty.text = "No bots yet — visit the Lab to build one."
+		empty.add_theme_color_override("font_color", Color(0.8, 0.8, 0.5))
+		mine_panel_party_container.add_child(empty)
+	else:
+		for bot in Inventory.permanent_bots:
+			var id: String = bot.get("id", "")
+			var dname: String = bot.get("display_name", "Bot")
+			var cost: int = int(bot.get("cp_cost", 1))
+			var row: HBoxContainer = HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			var cb: CheckBox = CheckBox.new()
+			cb.text = "%s  (CP %d)" % [dname, cost]
+			cb.button_pressed = bool(_party_selection.get(id, false))
+			var id_captured: String = id
+			var cost_captured: int = cost
+			cb.toggled.connect(func(pressed: bool) -> void:
+				_on_party_checkbox_toggled(id_captured, cost_captured, pressed)
+			)
+			row.add_child(cb)
+			mine_panel_party_container.add_child(row)
+	_update_party_summary_and_locks()
+
+
+func _on_party_checkbox_toggled(id: String, cost: int, pressed: bool) -> void:
+	if pressed:
+		if _party_cp_used + cost > Inventory.crystal_power_capacity:
+			# Reject: revert the checkbox on next refresh.
+			_party_selection[id] = false
+		else:
+			_party_selection[id] = true
+			_party_cp_used += cost
+	else:
+		if _party_selection.get(id, false):
+			_party_cp_used = maxi(0, _party_cp_used - cost)
+		_party_selection[id] = false
+	_refresh_mine_panel_party()
+
+
+func _update_party_summary_and_locks() -> void:
+	if mine_panel_party_summary:
+		mine_panel_party_summary.text = "CP %d / %d" % [_party_cp_used, Inventory.crystal_power_capacity]
+	# Disable checkboxes that would exceed the cap when toggled on.
+	for child in mine_panel_party_container.get_children():
+		if child is HBoxContainer:
+			for sub in child.get_children():
+				if sub is CheckBox:
+					var cb: CheckBox = sub
+					# Re-enable all, then disable those that would overflow.
+					cb.disabled = false
+		# Leave labels alone.
+	# Second pass: determine which unchecked ones overflow.
+	var idx: int = 0
+	for bot in Inventory.permanent_bots:
+		if idx >= mine_panel_party_container.get_child_count():
+			break
+		var row: Node = mine_panel_party_container.get_child(idx)
+		idx += 1
+		if not (row is HBoxContainer):
+			continue
+		var cb: CheckBox = row.get_child(0) as CheckBox
+		if cb == null:
+			continue
+		var id: String = bot.get("id", "")
+		var cost: int = int(bot.get("cp_cost", 1))
+		var currently_selected: bool = bool(_party_selection.get(id, false))
+		if not currently_selected and _party_cp_used + cost > Inventory.crystal_power_capacity:
+			cb.disabled = true
 
 
 func _close_mine_panel() -> void:
@@ -230,6 +340,12 @@ func _close_mine_panel() -> void:
 
 func _on_mine_panel_enter() -> void:
 	var cp: int = selected_checkpoint
+	# Commit party selection to Inventory.run_party before the run starts.
+	Inventory.run_party.clear()
+	for bot in Inventory.permanent_bots:
+		var id: String = bot.get("id", "")
+		if _party_selection.get(id, false):
+			Inventory.run_party.append(bot.duplicate(true))
 	# Unpause before scene change so the new scene starts clean.
 	mine_panel_open = false
 	mine_panel.visible = false
@@ -262,15 +378,15 @@ func _on_gold_changed(_new_gold: int) -> void:
 func _refresh_persistent_hud() -> void:
 	if town_gold_label:
 		town_gold_label.text = "%d" % GameManager.gold
-	if town_battery_label:
-		town_battery_label.text = "Bat x %d" % Inventory.batteries
+	if town_cp_label:
+		town_cp_label.text = "CP %d" % Inventory.crystal_power_capacity
 
 
 func _refresh_stats() -> void:
 	## Cheap stats-only refresh — safe to call every frame.
 	var ore_count: int = Inventory.get_used_slots()
-	stats_label.text = "Gold: %d | Ore: %d | Batteries: %d | Runs: %d | Deepest: B%dF" % [
-		GameManager.gold, ore_count, Inventory.batteries, GameManager.total_runs, GameManager.deepest_checkpoint]
+	stats_label.text = "Gold: %d | Ore: %d | CP: %d | Runs: %d | Deepest: B%dF" % [
+		GameManager.gold, ore_count, Inventory.crystal_power_capacity, GameManager.total_runs, GameManager.deepest_checkpoint]
 	sell_button.visible = ore_count > 0
 	sell_button.text = "Sell All Ore (%d pieces)" % ore_count
 
@@ -316,56 +432,4 @@ func _on_sell_ore() -> void:
 	_refresh_stats()
 
 
-func _show_scout_unlock_popup() -> void:
-	## Display a temporary notification that the Scout companion has been unlocked.
-	var popup_layer := CanvasLayer.new()
-	popup_layer.layer = 60
-	add_child(popup_layer)
-
-	var panel := PanelContainer.new()
-	panel.anchor_left = 0.5
-	panel.anchor_right = 0.5
-	panel.anchor_top = 0.3
-	panel.anchor_bottom = 0.3
-	panel.offset_left = -220
-	panel.offset_right = 220
-	panel.offset_top = -80
-	panel.offset_bottom = 80
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.08, 0.12, 0.18, 0.95)
-	style.border_color = Color(0.3, 0.9, 1.0)
-	style.border_width_top = 3
-	style.border_width_bottom = 3
-	style.border_width_left = 3
-	style.border_width_right = 3
-	style.content_margin_left = 20
-	style.content_margin_right = 20
-	style.content_margin_top = 16
-	style.content_margin_bottom = 16
-	panel.add_theme_stylebox_override("panel", style)
-	popup_layer.add_child(panel)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 8)
-	panel.add_child(vbox)
-
-	var title_label := Label.new()
-	title_label.text = "Crystal Companion Found!"
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title_label.add_theme_font_size_override("font_size", 26)
-	title_label.add_theme_color_override("font_color", Color(0.3, 0.9, 1.0))
-	vbox.add_child(title_label)
-
-	var desc_label := Label.new()
-	desc_label.text = "Scout joins your party."
-	desc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	desc_label.add_theme_font_size_override("font_size", 20)
-	vbox.add_child(desc_label)
-
-	# Fade out after 3 seconds
-	var tween := create_tween()
-	tween.tween_interval(3.0)
-	tween.tween_property(panel, "modulate:a", 0.0, 1.0)
-	tween.tween_callback(func() -> void:
-		popup_layer.queue_free()
-	)
+# (Scout unlock popup removed in Sprint 5 — Scout is now a Lab purchase.)

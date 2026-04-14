@@ -364,7 +364,7 @@ func _close_inspect_popup() -> void:
 
 func _refresh_side_panel() -> void:
 	gold_label.text = "Gold: %d" % GameManager.gold
-	battery_label.text = "Batteries: %d" % Inventory.batteries
+	battery_label.text = "Merge: %d/%d" % [Inventory.merge_charges, Inventory.merge_charges_max]
 	for child in followers_list.get_children():
 		child.queue_free()
 	followers_label.text = "FOLLOWERS"

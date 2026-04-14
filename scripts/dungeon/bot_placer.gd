@@ -84,42 +84,9 @@ func select_bot_and_ore(bot_data: BotData, ore_id: String, mineral_id: String) -
 	placement_started.emit(bot_data)
 
 
-func _confirm_placement(world_pos: Vector2) -> void:
-	if selected_bot == null:
-		return
-	# Check Emergency Battery artifact
-	var use_free_battery := false
-	if Inventory.has_artifact("emergency_battery") and not emergency_battery_used_this_floor:
-		use_free_battery = true
-	if not use_free_battery and not Inventory.can_build_bot(selected_bot, selected_ore_id, selected_mineral_id):
-		_cancel_placement()
-		return
-	# Build
-	var result: Dictionary
-	if use_free_battery:
-		# Spend ore but not battery
-		if not Inventory.spend_ore_specific(selected_ore_id, selected_mineral_id, selected_bot.ore_count):
-			_cancel_placement()
-			return
-		# Determine tier/mineral from ore
-		result = {"ore_tier": 1, "mineral": null}
-		for slot in Inventory.get_ore_stacks():
-			var key: String = slot.ore.id
-			if slot.mineral:
-				key += ":" + slot.mineral.id
-			if key == selected_ore_id + (":" + selected_mineral_id if selected_mineral_id != "" else ""):
-				result.ore_tier = slot.ore.tier
-				result.mineral = slot.mineral
-				break
-		emergency_battery_used_this_floor = true
-	else:
-		result = Inventory.build_bot(selected_bot, selected_ore_id, selected_mineral_id)
-	if result.is_empty():
-		_cancel_placement()
-		return
-	_spawn_bot(selected_bot, world_pos, result.ore_tier, result.mineral)
-	bot_built.emit(selected_bot, result.ore_tier, result.mineral)
-	_cleanup_ghost()
+func _confirm_placement(_world_pos: Vector2) -> void:
+	# Sprint 5: disposable bot building is disabled. Placement is a no-op.
+	_cancel_placement()
 
 
 func _cancel_placement() -> void:

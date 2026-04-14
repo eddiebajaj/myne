@@ -1,10 +1,9 @@
-[gd_scene load_steps=6 format=3 uid="uid://mining_floor_scene"]
+[gd_scene load_steps=5 format=3 uid="uid://mining_floor_scene"]
 
 [ext_resource type="Script" path="res://scripts/dungeon/mining_floor_controller.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/dungeon/floor_generator.gd" id="2"]
 [ext_resource type="PackedScene" uid="uid://player_scene" path="res://scenes/player/player.tscn" id="3"]
 [ext_resource type="Script" path="res://scripts/ui/mining_hud.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/dungeon/bot_placer.gd" id="5"]
 
 [node name="MiningFloor" type="Node2D"]
 script = ExtResource("1")
@@ -27,9 +26,6 @@ script = ExtResource("2")
 position = Vector2(120, 120)
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
-
-[node name="BotPlacer" type="Node2D" parent="."]
-script = ExtResource("5")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 process_mode = 3
@@ -216,5 +212,5 @@ offset_left = -200
 offset_top = -28
 offset_right = -10
 offset_bottom = -10
-text = "[B] Build  [E] Interact"
+text = "[X] Merge  [Y] Bag  [E] Interact"
 horizontal_alignment = 2

@@ -1,5 +1,5 @@
 extends Node
-## Grid-based backpack, bot roster, batteries, artifacts, mineral storage.
+## Grid-based backpack, bot roster, artifacts, mineral storage.
 ## Ore is both profit and bot material — the core tension.
 
 signal inventory_changed
@@ -13,10 +13,7 @@ var grid_width: int = 4
 var grid_height: int = 4
 var carried_ore: Array[Dictionary] = []
 
-# --- Batteries (purchased in town, consumed when building bots) ---
-var batteries: int = 0
-
-# --- Bots alive this run ---
+# --- Bots alive this run (legacy disposable system, retained for artifact/save plumbing) ---
 var follower_bots: Array[Dictionary] = []  # [{data: BotData, health: float, ore_tier: int, mineral: MineralData}]
 var checkpoint_bots: Array[Dictionary] = []
 
@@ -25,10 +22,22 @@ var artifacts: Array[Dictionary] = []  # [{data: ArtifactData}] or [{id: String,
 
 # --- Permanent bots (persist across runs, never lost) ---
 var permanent_bots: Array[Dictionary] = []
-# [{id: "scout", display_name: "Scout", max_health: 40.0, health: 40.0, knocked_out: false}]
+# [{id: "scout", display_name: "Scout", max_health: 40.0, health: 40.0,
+#   damage: 5.0, cp_cost: 1, hp_upgrade_level: 0, damage_upgrade_level: 0, knocked_out: false}]
 
 var run_party: Array[Dictionary] = []
-# Subset of permanent_bots selected for this run (auto-populated for now)
+# Subset of permanent_bots selected for this run (set by town mine entrance UI; fallback auto-populate)
+
+# --- Crystal Power (permanent, upgraded at Lab) ---
+var crystal_power_capacity: int = 1
+
+# --- Merge charges (reset each run, max upgraded at Lab) ---
+var merge_charges_max: int = 1
+var merge_charges: int = 1
+
+# --- Lab upgrade levels (used to compute scaling costs) ---
+var necklace_upgrade_level: int = 0  # 0 = starter (cap 1). Max 4 (cap 5).
+var merge_upgrade_level: int = 0     # 0 = starter (max 1). Max 3 (max 4).
 
 # --- Persistent storage ---
 var mineral_storage: Array[MineralData] = []  # Lab-extracted minerals
@@ -98,7 +107,6 @@ func add_ore(ore: OreData, mineral: MineralData = null, quantity: int = 1) -> bo
 
 func spend_ore_specific(ore_id: String, mineral_id: String, count: int) -> bool:
 	## Spend exactly [count] pieces of a specific ore+mineral combo.
-	## Used for bot building (no mixing allowed).
 	var key := ore_id
 	if mineral_id != "":
 		key = ore_id + ":" + mineral_id
@@ -114,8 +122,7 @@ func spend_ore_specific(ore_id: String, mineral_id: String, count: int) -> bool:
 
 
 func drop_one(ore_id: String, mineral_id: String) -> bool:
-	## Drops exactly one piece from the matching stack. Returns true on success.
-	## If the stack quantity hits 0 the slot is removed from carried_ore.
+	## Drops exactly one piece from the matching stack.
 	var key: String = ore_id
 	if mineral_id != "":
 		key = ore_id + ":" + mineral_id
@@ -131,7 +138,6 @@ func drop_one(ore_id: String, mineral_id: String) -> bool:
 
 
 func get_stack_quantity(ore_id: String, mineral_id: String) -> int:
-	## Returns the current quantity for a given ore+mineral stack, or 0 if no such stack.
 	var key: String = ore_id
 	if mineral_id != "":
 		key = ore_id + ":" + mineral_id
@@ -166,32 +172,27 @@ func count_plain_t1_ore() -> int:
 	return total
 
 
-func craft_battery() -> bool:
-	## Consumes 3 plain T1 ore (mixable across types) and adds 1 battery.
-	## Prefers spending from smallest stacks first to consolidate inventory.
-	## Returns false if player lacks 3 plain T1 ore.
-	if count_plain_t1_ore() < 3:
+func spend_plain_t1_ore(amount: int) -> bool:
+	## Consumes [amount] plain T1 ore across stacks (smallest-first). Returns false if insufficient.
+	if count_plain_t1_ore() < amount:
 		return false
-	# Build list of plain T1 slots, sorted smallest-first
 	var plain_slots: Array[Dictionary] = []
 	for slot in carried_ore:
 		if slot.mineral == null and slot.ore.tier == 1:
 			plain_slots.append(slot)
 	plain_slots.sort_custom(func(a, b): return int(a.quantity) < int(b.quantity))
-	var remaining: int = 3
+	var remaining: int = amount
 	for slot in plain_slots:
 		if remaining <= 0:
 			break
 		var take: int = mini(int(slot.quantity), remaining)
 		slot.quantity -= take
 		remaining -= take
-	# Remove any emptied slots
 	var i: int = carried_ore.size() - 1
 	while i >= 0:
 		if int(carried_ore[i].quantity) <= 0:
 			carried_ore.remove_at(i)
 		i -= 1
-	batteries += 1
 	inventory_changed.emit()
 	return true
 
@@ -201,61 +202,17 @@ func get_ore_stacks() -> Array[Dictionary]:
 	return carried_ore
 
 
-# === Batteries ===
+# === Merge charges ===
 
-func add_batteries(count: int) -> void:
-	batteries += count
-
-
-func use_battery() -> bool:
-	if batteries <= 0:
+func use_merge_charge() -> bool:
+	if merge_charges <= 0:
 		return false
-	# Check Emergency Battery artifact
-	if has_artifact("emergency_battery"):
-		# First bot per floor is free — handled by caller checking artifact
-		pass
-	batteries -= 1
+	merge_charges -= 1
+	inventory_changed.emit()
 	return true
 
 
-# === Bots ===
-
-func can_build_bot(bot: BotData, ore_id: String, mineral_id: String) -> bool:
-	## Check if player has enough of the specific ore type + a battery.
-	var key := ore_id
-	if mineral_id != "":
-		key = ore_id + ":" + mineral_id
-	for slot in carried_ore:
-		if _get_slot_key(slot.ore, slot.mineral) == key:
-			if slot.quantity >= bot.ore_count:
-				return batteries > 0
-	return false
-
-
-func build_bot(bot: BotData, ore_id: String, mineral_id: String) -> Dictionary:
-	## Build a bot. Returns {ore_tier, mineral} for the spawned bot, or empty dict on failure.
-	if not can_build_bot(bot, ore_id, mineral_id):
-		return {}
-	# Find the ore slot to determine tier and mineral
-	var key := ore_id
-	if mineral_id != "":
-		key = ore_id + ":" + mineral_id
-	var ore_tier := 1
-	var mineral_mod: MineralData = null
-	for slot in carried_ore:
-		if _get_slot_key(slot.ore, slot.mineral) == key:
-			ore_tier = slot.ore.tier
-			mineral_mod = slot.mineral
-			break
-	if not spend_ore_specific(ore_id, mineral_id, bot.ore_count):
-		return {}
-	if not use_battery():
-		return {}  # Shouldn't happen if can_build_bot passed
-	if bot.category == BotData.BotCategory.FOLLOWER:
-		follower_bots.append({"data": bot, "health": bot.get_scaled_health(ore_tier), "ore_tier": ore_tier, "mineral": mineral_mod})
-		bots_changed.emit()
-	return {"ore_tier": ore_tier, "mineral": mineral_mod}
-
+# === Bots (legacy disposable build stub — retained so old code compiles) ===
 
 func save_checkpoint() -> void:
 	checkpoint_bots = follower_bots.duplicate(true)
@@ -290,7 +247,7 @@ func take_stored_mineral(mineral_id: String) -> MineralData:
 
 # === Permanent Bots ===
 
-func unlock_permanent_bot(id: String, display_name: String, max_hp: float) -> void:
+func unlock_permanent_bot(id: String, display_name: String, max_hp: float, damage: float = 5.0, cp_cost: int = 1) -> void:
 	if has_permanent_bot(id):
 		return
 	permanent_bots.append({
@@ -298,8 +255,13 @@ func unlock_permanent_bot(id: String, display_name: String, max_hp: float) -> vo
 		"display_name": display_name,
 		"max_health": max_hp,
 		"health": max_hp,
+		"damage": damage,
+		"cp_cost": cp_cost,
+		"hp_upgrade_level": 0,
+		"damage_upgrade_level": 0,
 		"knocked_out": false,
 	})
+	bots_changed.emit()
 
 
 func has_permanent_bot(id: String) -> bool:
@@ -307,6 +269,13 @@ func has_permanent_bot(id: String) -> bool:
 		if bot.get("id", "") == id:
 			return true
 	return false
+
+
+func get_permanent_bot(id: String) -> Dictionary:
+	for bot in permanent_bots:
+		if bot.get("id", "") == id:
+			return bot
+	return {}
 
 
 func knock_out_bot(id: String) -> void:
@@ -325,15 +294,18 @@ func restore_permanent_bots() -> void:
 
 
 func _populate_run_party() -> void:
-	## Auto-populate run_party from permanent_bots (all non-knocked-out, max 2).
+	## Fallback: auto-populate from permanent_bots within CP budget. Only used
+	## if the town UI didn't set run_party explicitly before begin_run().
 	run_party.clear()
-	var count := 0
+	var cp_used := 0
 	for bot in permanent_bots:
-		if count >= 2:
-			break
-		if not bot.get("knocked_out", false):
-			run_party.append(bot.duplicate())
-			count += 1
+		if bot.get("knocked_out", false):
+			continue
+		var cost: int = int(bot.get("cp_cost", 1))
+		if cp_used + cost > crystal_power_capacity:
+			continue
+		run_party.append(bot.duplicate(true))
+		cp_used += cost
 
 
 # === Run Lifecycle ===
@@ -343,10 +315,11 @@ func begin_run() -> void:
 	follower_bots.clear()
 	checkpoint_bots.clear()
 	artifacts.clear()
-	# Start each run with 3 batteries for testing
-	batteries = 3
-	# Populate run party from permanent bots
-	_populate_run_party()
+	# Reset merge charges for the new run
+	merge_charges = merge_charges_max
+	# If town UI didn't set run_party, fall back to auto-populate
+	if run_party.is_empty():
+		_populate_run_party()
 	inventory_changed.emit()
 	bots_changed.emit()
 
