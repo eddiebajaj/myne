@@ -32,6 +32,7 @@ func setup(data: OreData, mineral_mod: MineralData = null) -> void:
 	hits_remaining = OreData.get_hits_to_break(pickaxe_tier, data.tier)
 	if sprite:
 		sprite.color = data.color
+	_try_apply_texture()
 	if health_bar:
 		health_bar.max_value = hits_remaining
 		health_bar.value = hits_remaining
@@ -43,6 +44,34 @@ func setup(data: OreData, mineral_mod: MineralData = null) -> void:
 			mineral_glow.color = Color(mineral.color, 0.4)
 		else:
 			mineral_glow.visible = false
+
+
+func _try_apply_texture() -> void:
+	## If a pixel-art texture exists at res://resources/sprites/ores/<id>.png,
+	## add a Sprite2D child and hide the ColorRect fallback. Mineral glow stays
+	## as-is so it still indicates modifiers.
+	if ore_data == null or ore_data.id.is_empty():
+		return
+	var existing := get_node_or_null("BodyTexture") as Sprite2D
+	var tex_path: String = "res://resources/sprites/ores/%s.png" % ore_data.id
+	var sprite_size: Vector2 = Vector2(32, 32)
+	if sprite:
+		sprite_size = sprite.size
+	var tex_sprite: Sprite2D = SpriteUtil.try_load_sprite(tex_path, sprite_size)
+	if tex_sprite:
+		tex_sprite.name = "BodyTexture"
+		if existing:
+			existing.queue_free()
+		add_child(tex_sprite)
+		if sprite:
+			sprite.visible = false
+	else:
+		# No texture: make sure any stale texture from a previous setup is gone
+		# and the ColorRect fallback is visible.
+		if existing:
+			existing.queue_free()
+		if sprite:
+			sprite.visible = true
 
 
 func take_hit(power: int = 1) -> void:

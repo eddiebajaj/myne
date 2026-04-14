@@ -6,6 +6,15 @@ extends Node2D
 @onready var camera: Camera2D = $Player/Camera2D
 @onready var hud: Control = $CanvasLayer/MiningHUD
 
+# Per-bot texture filename mapping. Backpack bot's id is "backpack_bot" but the
+# sprite file is just "backpack.png" for brevity.
+const BOT_TEXTURE_FILES: Dictionary = {
+	"scout": "scout.png",
+	"miner": "miner.png",
+	"striker": "striker.png",
+	"backpack_bot": "backpack.png",
+}
+
 
 func _ready() -> void:
 	# Ensure game is not paused (in case we came from a paused build menu)
@@ -148,5 +157,16 @@ func _spawn_permanent_bot(entry: Dictionary, pos: Vector2) -> void:
 	var sprite_rect: ColorRect = root.get_node_or_null("Sprite") as ColorRect
 	if sprite_rect:
 		sprite_rect.color = bot_color
+	# Optional pixel-art texture. If res://resources/sprites/bots/<file> exists,
+	# add a Sprite2D and hide the ColorRect fallback.
+	var tex_file: String = BOT_TEXTURE_FILES.get(bot_id, "")
+	if tex_file != "":
+		var tex_path: String = "res://resources/sprites/bots/" + tex_file
+		var tex_sprite: Sprite2D = SpriteUtil.try_load_sprite(tex_path, bot_size)
+		if tex_sprite:
+			tex_sprite.name = "BodyTexture"
+			root.add_child(tex_sprite)
+			if sprite_rect:
+				sprite_rect.visible = false
 	root.add_to_group("bots")
 	root.add_to_group("permanent_bots")

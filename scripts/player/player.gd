@@ -10,6 +10,7 @@ const MOVE_SPEED := 200.0              # Fixed — not upgradeable
 const PICKAXE_RANGE := 48.0
 const BASE_SWING_COOLDOWN := 0.35
 const BASE_PICKAXE_DAMAGE := 3.0       # Low — you're a miner
+const TEXTURE_PATH := "res://resources/sprites/player/player.png"
 
 enum DamageType { PHYSICAL, VENOM }
 
@@ -66,6 +67,13 @@ func _ready() -> void:
 	facing_nose.size = Vector2(10, 10)
 	facing_nose.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(facing_nose)
+	# Optional pixel-art sprite: if res://resources/sprites/player/player.png
+	# exists, show it and hide the ColorRect fallback.
+	var tex_sprite: Sprite2D = SpriteUtil.try_load_sprite(TEXTURE_PATH, Vector2(28, 28))
+	if tex_sprite:
+		tex_sprite.name = "BodyTexture"
+		add_child(tex_sprite)
+		body_sprite.visible = false
 	_update_facing_visuals()
 	health_changed.emit(health, max_health, armor, max_armor)
 	# Connect touch signal for reliable mobile mining

@@ -43,6 +43,26 @@ func setup(enemy_data: EnemyData) -> void:
 	if health_bar:
 		health_bar.max_value = health
 		health_bar.value = health
+	_try_apply_texture()
+
+
+func _try_apply_texture() -> void:
+	## If a pixel-art texture exists at res://resources/sprites/enemies/<id>.png,
+	## add a Sprite2D child and hide the ColorRect fallback. No-op if missing.
+	if data == null or data.id.is_empty():
+		return
+	if has_node("BodyTexture"):
+		return  # setup() can be called more than once; don't double-add
+	var tex_path: String = "res://resources/sprites/enemies/%s.png" % data.id
+	var sprite_size: Vector2 = Vector2(20, 20)
+	if sprite:
+		sprite_size = sprite.size
+	var tex_sprite: Sprite2D = SpriteUtil.try_load_sprite(tex_path, sprite_size)
+	if tex_sprite:
+		tex_sprite.name = "BodyTexture"
+		add_child(tex_sprite)
+		if sprite:
+			sprite.visible = false
 
 
 func _physics_process(delta: float) -> void:
