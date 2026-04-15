@@ -3,13 +3,15 @@ extends RefCounted
 ## Helpers for wiring Control focus neighbors (wrap-around navigation).
 
 ## Wires a vertical list of focusable Controls so up/down wraps around.
-## Accepts any Control (Button, CheckBox, etc.). Disabled entries are skipped.
+## Accepts any Control (Button, CheckBox, etc.). Disabled entries are INCLUDED
+## in the focus cycle — Godot's Button accepts focus when disabled but ignores
+## ui_accept/click presses, so focus can land on them (so the player sees they
+## exist) but pressing A does nothing. This is the desired behavior for menus
+## where some options are greyed out (can't afford, already owned, etc.).
 static func wire_vertical_wrap(controls: Array) -> void:
 	var usable: Array = []
 	for c in controls:
 		if c == null or not (c is Control):
-			continue
-		if "disabled" in c and bool(c.disabled):
 			continue
 		usable.append(c)
 	var n := usable.size()

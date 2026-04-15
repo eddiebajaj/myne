@@ -34,7 +34,11 @@ var _action_press_frame: Dictionary = {}  # action_name -> last frame pressed (d
 ## Joystick → UI nav state (only used when get_tree().paused == true)
 const JOY_UI_ACTIVATE := 0.5
 const JOY_UI_RELEASE := 0.3
+const JOY_UI_REPEAT_DELAY := 0.4     # initial hold duration before auto-repeat kicks in
+const JOY_UI_REPEAT_INTERVAL := 0.1  # time between auto-repeat fires while held
 var _joy_ui_axis_state: Vector2i = Vector2i.ZERO  # Current "pressed" state per axis (-1/0/+1)
+var _joy_ui_held_time: Vector2 = Vector2.ZERO    # seconds axis held past activation
+var _joy_ui_next_repeat: Vector2 = Vector2.ZERO  # next held_time threshold to fire on
 var _joy_touch_index: int = -1
 var _joy_center: Vector2 = Vector2.ZERO
 var _joy_knob: ColorRect = null
@@ -331,41 +335,65 @@ func _ui_action_for(action_name: String) -> String:
 
 # ─── Joystick → UI directional nav (Sprint 6 Pillar A) ───────────────
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if get_tree().paused:
-		_process_ui_joystick()
+		_process_ui_joystick(delta)
 	else:
 		# Outside UI mode, clear state so first deflection next time fires fresh.
 		if _joy_ui_axis_state != Vector2i.ZERO:
 			_joy_ui_axis_state = Vector2i.ZERO
+			_joy_ui_held_time = Vector2.ZERO
+			_joy_ui_next_repeat = Vector2.ZERO
 
 
-func _process_ui_joystick() -> void:
-	# X axis
-	var new_x: int = _joy_ui_axis_state.x
-	if _joy_ui_axis_state.x == 0:
-		if joystick_dir.x > JOY_UI_ACTIVATE:
-			new_x = 1
-			_fire_ui_direction("ui_right")
-		elif joystick_dir.x < -JOY_UI_ACTIVATE:
-			new_x = -1
-			_fire_ui_direction("ui_left")
-	else:
-		if absf(joystick_dir.x) < JOY_UI_RELEASE:
-			new_x = 0
-	# Y axis
-	var new_y: int = _joy_ui_axis_state.y
-	if _joy_ui_axis_state.y == 0:
-		if joystick_dir.y > JOY_UI_ACTIVATE:
-			new_y = 1
-			_fire_ui_direction("ui_down")
-		elif joystick_dir.y < -JOY_UI_ACTIVATE:
-			new_y = -1
-			_fire_ui_direction("ui_up")
-	else:
-		if absf(joystick_dir.y) < JOY_UI_RELEASE:
-			new_y = 0
-	_joy_ui_axis_state = Vector2i(new_x, new_y)
+func _process_ui_joystick(delta: float) -> void:
+	# --- X axis ---
+	var dir_x := 0
+	if joystick_dir.x > JOY_UI_ACTIVATE:
+		dir_x = 1
+	elif joystick_dir.x < -JOY_UI_ACTIVATE:
+		dir_x = -1
+
+	if dir_x != 0:
+		if _joy_ui_axis_state.x != dir_x:
+			# New direction — fire immediately, start hold timer.
+			_fire_ui_direction("ui_right" if dir_x > 0 else "ui_left")
+			_joy_ui_axis_state.x = dir_x
+			_joy_ui_held_time.x = 0.0
+			_joy_ui_next_repeat.x = JOY_UI_REPEAT_DELAY
+		else:
+			# Same direction held — accumulate and fire on repeat schedule.
+			_joy_ui_held_time.x += delta
+			if _joy_ui_held_time.x >= _joy_ui_next_repeat.x:
+				_fire_ui_direction("ui_right" if dir_x > 0 else "ui_left")
+				_joy_ui_next_repeat.x += JOY_UI_REPEAT_INTERVAL
+	elif absf(joystick_dir.x) < JOY_UI_RELEASE:
+		_joy_ui_axis_state.x = 0
+		_joy_ui_held_time.x = 0.0
+		_joy_ui_next_repeat.x = 0.0
+
+	# --- Y axis ---
+	var dir_y := 0
+	if joystick_dir.y > JOY_UI_ACTIVATE:
+		dir_y = 1
+	elif joystick_dir.y < -JOY_UI_ACTIVATE:
+		dir_y = -1
+
+	if dir_y != 0:
+		if _joy_ui_axis_state.y != dir_y:
+			_fire_ui_direction("ui_down" if dir_y > 0 else "ui_up")
+			_joy_ui_axis_state.y = dir_y
+			_joy_ui_held_time.y = 0.0
+			_joy_ui_next_repeat.y = JOY_UI_REPEAT_DELAY
+		else:
+			_joy_ui_held_time.y += delta
+			if _joy_ui_held_time.y >= _joy_ui_next_repeat.y:
+				_fire_ui_direction("ui_down" if dir_y > 0 else "ui_up")
+				_joy_ui_next_repeat.y += JOY_UI_REPEAT_INTERVAL
+	elif absf(joystick_dir.y) < JOY_UI_RELEASE:
+		_joy_ui_axis_state.y = 0
+		_joy_ui_held_time.y = 0.0
+		_joy_ui_next_repeat.y = 0.0
 
 
 func _fire_ui_direction(action: String) -> void:
