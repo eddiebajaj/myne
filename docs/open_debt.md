@@ -20,11 +20,15 @@ Carried forward each sprint. Items are added when deferred, removed when resolve
 | D10 | Pixel art production | Sprint 4 | Medium | Infrastructure ready (Sprint 5). Sprites deferred — needs paid tool or asset pack |
 | D11 | BackpackPanel autoload is dead code in mine | Sprint 3 | Low | Still registered, may be used in town |
 | D12 | Town scene input/UI overhaul | Sprint 3 | Medium | Town still uses old input patterns |
-| D17 | Bot balance tuning | Sprint 5 | High | Ranges, HP, damage for 4 bot types — untested playtest data |
+| D17 | Bot balance tuning | Sprint 5 | Medium | Ranges, HP, damage — Eddie noted but deferred ("keep B as is") |
 | D18 | Merge effect redesign per-bot | Sprint 5 | Medium | Eddie flagged "merge effect will be different than what you listed" |
 | D19 | Tetris-like backpack shapes | Sprint 5 | Medium | Eddie mentioned as upcoming |
 | D20 | Storage tabs / upgrade path | Sprint 5 | Low | Once base 48 slots fill up |
 | D21 | Rare bot blueprints (Guardian, Healer, Amplifier) | Sprint 5 | Medium | Need progression gates |
+| D22 | Bot upgrades using new crafting mechanic | Sprint 6 | High | Sprint 8 — old upgrade view hidden in Sprint 7 |
+| D23 | Backpack grid navigation | Sprint 6 | Low | Deferred until tetris-like rework |
+| D24 | Bot rename UI | Sprint 7 | Low | Auto-numbering for now ("Scout #1") |
+| D25 | Sound effects (negative SFX, hit feedback) | Sprint 6 | Low | Future polish |
 
 ## Resolved (Sprint 5)
 
