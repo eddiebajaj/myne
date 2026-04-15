@@ -7,7 +7,6 @@ extends Node2D
 const FLOOR_WIDTH := 1400.0
 const FLOOR_HEIGHT := 1000.0
 const WALL_THICKNESS := 32.0
-const MINERAL_CHANCE := 0.25  # 25% of nodes have a mineral
 
 var ore_types: Array[OreData] = []
 var all_minerals: Array[MineralData] = []
@@ -69,7 +68,7 @@ func _spawn_ore_nodes() -> void:
 		if ore == null:
 			continue
 		var mineral: MineralData = null
-		var mineral_roll := MINERAL_CHANCE
+		var mineral_roll := _get_mineral_chance()
 		# Check for Lucky Strike artifact
 		if Inventory.has_artifact("lucky_strike"):
 			mineral_roll += 0.15
@@ -77,6 +76,16 @@ func _spawn_ore_nodes() -> void:
 			mineral = all_minerals[randi() % all_minerals.size()]
 		var pos: Vector2 = _reserve_position(60.0, 40.0, 20, ore_zone)
 		spawn_ore_node_at(pos, ore, mineral)
+
+
+func _get_mineral_chance() -> float:
+	var floor_num: int = GameManager.current_floor
+	if floor_num <= 3:
+		return 0.05
+	elif floor_num <= 5:
+		return 0.15
+	else:
+		return 0.25
 
 
 func spawn_ore_node_at(pos: Vector2, ore: OreData, mineral: MineralData = null) -> void:

@@ -568,11 +568,16 @@ func _refresh_bp_side() -> void:
 		row.add_child(pip)
 		var name_label: Label = Label.new()
 		var dname: String = entry.get("display_name", "Companion")
+		var suffix: String = Inventory.format_mineral_suffix(
+			entry.get("mineral_profile", {}),
+			entry.get("void_resolved", []),
+		)
+		var suffixed: String = dname if suffix.is_empty() else "%s %s" % [dname, suffix]
 		if entry.get("knocked_out", false):
-			name_label.text = "  %s (KO)" % dname
+			name_label.text = "  %s (KO)" % suffixed
 			name_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55))
 		else:
-			name_label.text = "  %s" % dname
+			name_label.text = "  %s" % suffixed
 		row.add_child(name_label)
 		_bp_followers_list.add_child(row)
 	# Show disposable follower bots

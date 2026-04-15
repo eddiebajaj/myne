@@ -22,8 +22,46 @@ var artifacts: Array[Dictionary] = []  # [{data: ArtifactData}] or [{id: String,
 
 # --- Permanent bots (persist across runs, never lost) ---
 var permanent_bots: Array[Dictionary] = []
-# [{id: "scout", display_name: "Scout", max_health: 40.0, health: 40.0,
-#   damage: 5.0, cp_cost: 1, hp_upgrade_level: 0, damage_upgrade_level: 0, knocked_out: false}]
+# Sprint 7: multi-instance + mineral_profile.
+# [{id: "scout", instance_number: 1, display_name: "Scout #1",
+#   max_health: 40.0, health: 40.0, damage: 5.0, cp_cost: 1,
+#   hp_upgrade_level: 0, damage_upgrade_level: 0, knocked_out: false,
+#   mineral_profile: {fire,ice,earth,thunder,venom,wind,void all int},
+#   void_resolved: [String, ...]}]
+
+# === Sprint 7 crafting constants ===
+const ORE_POINTS_BY_TIER := {
+	1: 1,
+	2: 3,
+	3: 9,
+	4: 27,
+}
+const BOT_BUILD_THRESHOLD := 10
+const MINERAL_KEYS := ["fire", "ice", "earth", "thunder", "venom", "wind", "void"]
+const VOID_REAL_TYPES := ["fire", "ice", "earth", "thunder", "venom", "wind"]
+
+
+static func empty_mineral_profile() -> Dictionary:
+	return {"fire": 0, "ice": 0, "earth": 0, "thunder": 0, "venom": 0, "wind": 0, "void": 0}
+
+
+static func format_mineral_suffix(profile: Dictionary, void_resolved: Array = []) -> String:
+	## Spec §A10: compact display suffix for a bot, e.g. "(Fire+3, Earth+1)".
+	## Void is shown as "Void+N" where N = void_resolved.size() (resolved count).
+	## Returns "" if everything is zero/empty.
+	if profile == null or profile.is_empty():
+		return ""
+	var parts: Array[String] = []
+	for key in VOID_REAL_TYPES:
+		var v: int = int(profile.get(key, 0))
+		if v > 0:
+			parts.append("%s+%d" % [key.capitalize(), v])
+	var void_n: int = void_resolved.size() if void_resolved != null else 0
+	if void_n > 0:
+		parts.append("Void+%d" % void_n)
+	if parts.is_empty():
+		return ""
+	return "(" + ", ".join(parts) + ")"
 
 var run_party: Array[Dictionary] = []
 # Subset of permanent_bots selected for this run (set by town mine entrance UI; fallback auto-populate)
@@ -261,11 +299,13 @@ func take_stored_mineral(mineral_id: String) -> MineralData:
 # === Permanent Bots ===
 
 func unlock_permanent_bot(id: String, display_name: String, max_hp: float, damage: float = 5.0, cp_cost: int = 1) -> void:
-	if has_permanent_bot(id):
-		return
+	## Sprint 7: multi-instance allowed. No "already owned" gate. Auto-numbers display name.
+	var instance_number := count_permanent_bots_of_type(id) + 1
+	var final_name := "%s #%d" % [display_name, instance_number]
 	permanent_bots.append({
 		"id": id,
-		"display_name": display_name,
+		"instance_number": instance_number,
+		"display_name": final_name,
 		"max_health": max_hp,
 		"health": max_hp,
 		"damage": damage,
@@ -273,22 +313,75 @@ func unlock_permanent_bot(id: String, display_name: String, max_hp: float, damag
 		"hp_upgrade_level": 0,
 		"damage_upgrade_level": 0,
 		"knocked_out": false,
+		"mineral_profile": empty_mineral_profile(),
+		"void_resolved": [],
 	})
 	bots_changed.emit()
 
 
+func add_permanent_bot(entry: Dictionary) -> void:
+	## Sprint 7: append a fully-formed bot entry (used by Lab crafting).
+	## Caller is responsible for id/stats; this fills in instance_number and emits.
+	var id: String = entry.get("id", "bot")
+	var instance_number := count_permanent_bots_of_type(id) + 1
+	entry["instance_number"] = instance_number
+	if not entry.has("mineral_profile"):
+		entry["mineral_profile"] = empty_mineral_profile()
+	if not entry.has("void_resolved"):
+		entry["void_resolved"] = []
+	if not entry.has("knocked_out"):
+		entry["knocked_out"] = false
+	if not entry.has("hp_upgrade_level"):
+		entry["hp_upgrade_level"] = 0
+	if not entry.has("damage_upgrade_level"):
+		entry["damage_upgrade_level"] = 0
+	permanent_bots.append(entry)
+	bots_changed.emit()
+
+
 func has_permanent_bot(id: String) -> bool:
+	## Sprint 7: kept for legacy callers but no longer gates building.
 	for bot in permanent_bots:
 		if bot.get("id", "") == id:
 			return true
 	return false
 
 
+func count_permanent_bots_of_type(id: String) -> int:
+	var n := 0
+	for bot in permanent_bots:
+		if bot.get("id", "") == id:
+			n += 1
+	return n
+
+
 func get_permanent_bot(id: String) -> Dictionary:
+	## Returns the FIRST instance of [id]. Use sparingly post-Sprint 7 since multiple may exist.
 	for bot in permanent_bots:
 		if bot.get("id", "") == id:
 			return bot
 	return {}
+
+
+func ensure_bot_migration(entry: Dictionary, type_display_name: String = "") -> void:
+	## Backfills Sprint 7 fields on legacy permanent_bot entries (in-place).
+	if not entry.has("mineral_profile"):
+		entry["mineral_profile"] = empty_mineral_profile()
+	else:
+		var prof: Dictionary = entry["mineral_profile"]
+		for k in MINERAL_KEYS:
+			if not prof.has(k):
+				prof[k] = 0
+	if not entry.has("void_resolved"):
+		entry["void_resolved"] = []
+	if not entry.has("instance_number"):
+		entry["instance_number"] = 1
+	var name_str: String = String(entry.get("display_name", ""))
+	if name_str == "" or name_str.find("#") == -1:
+		var base_name := type_display_name
+		if base_name == "":
+			base_name = name_str if name_str != "" else String(entry.get("id", "Bot")).capitalize()
+		entry["display_name"] = "%s #%d" % [base_name, int(entry.get("instance_number", 1))]
 
 
 func knock_out_bot(id: String) -> void:
@@ -436,6 +529,57 @@ func withdraw_one_from_storage(ore_id: String, mineral_id: String) -> bool:
 
 func get_storage_stacks() -> Array[Dictionary]:
 	return storage
+
+
+func count_ore_combined(ore_id: String, mineral_id: String) -> int:
+	## Total count of a specific ore+mineral across storage + backpack.
+	var total: int = 0
+	var key: String = ore_id
+	if mineral_id != "":
+		key = ore_id + ":" + mineral_id
+	for slot in storage:
+		if _get_slot_key(slot.ore, slot.mineral) == key:
+			total += int(slot.quantity)
+	for slot in carried_ore:
+		if _get_slot_key(slot.ore, slot.mineral) == key:
+			total += int(slot.quantity)
+	return total
+
+
+func spend_ore_combined(ore_id: String, mineral_id: String, amount: int) -> bool:
+	## Spend [amount] of a specific ore+mineral, storage first then backpack.
+	if count_ore_combined(ore_id, mineral_id) < amount:
+		return false
+	var key: String = ore_id
+	if mineral_id != "":
+		key = ore_id + ":" + mineral_id
+	var remaining: int = amount
+	# Storage first.
+	var i: int = 0
+	while i < storage.size() and remaining > 0:
+		var slot: Dictionary = storage[i]
+		if _get_slot_key(slot.ore, slot.mineral) == key:
+			var take: int = mini(int(slot.quantity), remaining)
+			slot.quantity -= take
+			remaining -= take
+			if int(slot.quantity) <= 0:
+				storage.remove_at(i)
+				continue
+		i += 1
+	# Then backpack.
+	i = 0
+	while i < carried_ore.size() and remaining > 0:
+		var slot: Dictionary = carried_ore[i]
+		if _get_slot_key(slot.ore, slot.mineral) == key:
+			var take: int = mini(int(slot.quantity), remaining)
+			slot.quantity -= take
+			remaining -= take
+			if int(slot.quantity) <= 0:
+				carried_ore.remove_at(i)
+				continue
+		i += 1
+	inventory_changed.emit()
+	return remaining == 0
 
 
 func count_plain_t1_ore_combined() -> int:

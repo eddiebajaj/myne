@@ -15,6 +15,16 @@ const BOT_TEXTURE_FILES: Dictionary = {
 	"backpack_bot": "backpack.png",
 }
 
+# Sprint 7: Lookup from bot id to its canonical type display name. Used by
+# Inventory.ensure_bot_migration() to synthesize "Scout #1"-style names for
+# legacy save entries that predate the multi-instance rename.
+const BOT_TYPE_DISPLAY_NAMES: Dictionary = {
+	"scout": "Scout",
+	"miner": "Miner",
+	"striker": "Striker",
+	"backpack_bot": "Backpack Bot",
+}
+
 
 func _ready() -> void:
 	# Ensure game is not paused (in case we came from a paused build menu)
@@ -52,8 +62,13 @@ func _respawn_permanent_bots() -> void:
 func _spawn_permanent_bot(entry: Dictionary, pos: Vector2) -> void:
 	## Build a permanent bot scene programmatically and add it to the floor.
 	## Applies Lab upgrade levels (hp_upgrade_level / damage_upgrade_level) to
-	## the base stats for the bot type.
+	## the base stats for the bot type, then layers Sprint 7 mineral bonuses
+	## (mineral_profile + void_resolved) on top.
 	var bot_id: String = entry.get("id", "")
+	# Ensure legacy save entries have the Sprint 7 fields (mineral_profile,
+	# void_resolved, instance_number, display_name with "#N") before we read.
+	var type_dname: String = BOT_TYPE_DISPLAY_NAMES.get(bot_id, String(bot_id).capitalize())
+	Inventory.ensure_bot_migration(entry, type_dname)
 	var dname: String = entry.get("display_name", "Companion")
 	var hp_up: int = int(entry.get("hp_upgrade_level", 0))
 	var dmg_up: int = int(entry.get("damage_upgrade_level", 0))
@@ -100,6 +115,34 @@ func _spawn_permanent_bot(entry: Dictionary, pos: Vector2) -> void:
 	# Upgrade bonuses apply on top of base stats stored in the entry
 	var base_max_hp: float = float(entry.get("max_health", 40.0)) + hp_up * 10.0
 	var base_damage: float = float(entry.get("damage", 0.0)) + dmg_up * 1.0
+
+	# Sprint 7: apply mineral_profile + void_resolved bonuses on top of
+	# (base + upgrade) stats. Counts are per-mineral piece.
+	#   Fire: +1 damage / piece
+	#   Earth: +5 max_health / piece
+	#   Wind: attack_speed *= 1 + count * 0.05
+	#   Ice/Thunder/Venom: stored as meta for on-hit systems (no combat logic here)
+	#   Void: each resolved entry acts as one piece of its resolved type
+	var profile: Dictionary = entry.get("mineral_profile", {})
+	var void_resolved: Array = entry.get("void_resolved", [])
+	var fire_n: int = int(profile.get("fire", 0))
+	var earth_n: int = int(profile.get("earth", 0))
+	var wind_n: int = int(profile.get("wind", 0))
+	var ice_n: int = int(profile.get("ice", 0))
+	var thunder_n: int = int(profile.get("thunder", 0))
+	var venom_n: int = int(profile.get("venom", 0))
+	for resolved in void_resolved:
+		match String(resolved):
+			"fire": fire_n += 1
+			"earth": earth_n += 1
+			"wind": wind_n += 1
+			"ice": ice_n += 1
+			"thunder": thunder_n += 1
+			"venom": venom_n += 1
+	base_damage += float(fire_n) * 1.0
+	base_max_hp += float(earth_n) * 5.0
+	atk_speed *= 1.0 + float(wind_n) * 0.05
+
 	var current_hp: float = minf(float(entry.get("health", base_max_hp)), base_max_hp)
 	# Keep the entry's max_health in sync so HUD / merge respawn use upgraded value
 	entry["max_health"] = base_max_hp
@@ -150,6 +193,14 @@ func _spawn_permanent_bot(entry: Dictionary, pos: Vector2) -> void:
 
 	# Configure the permanent bot
 	root.setup_permanent(bot_id, dname, base_max_hp, base_damage, atk_range, atk_speed, move_spd, follow_dist)
+	# Sprint 7: stash mineral piece counts as meta so future on-hit systems can
+	# read them without requiring changes to existing combat code today.
+	root.set_meta("fire_count", fire_n)
+	root.set_meta("earth_count", earth_n)
+	root.set_meta("wind_count", wind_n)
+	root.set_meta("ice_count", ice_n)
+	root.set_meta("thunder_count", thunder_n)
+	root.set_meta("venom_count", venom_n)
 	root.health = current_hp
 	if root.health_bar:
 		root.health_bar.value = current_hp

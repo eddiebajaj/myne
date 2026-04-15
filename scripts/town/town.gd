@@ -294,10 +294,15 @@ func _refresh_mine_panel_party() -> void:
 			var id: String = bot.get("id", "")
 			var dname: String = bot.get("display_name", "Bot")
 			var cost: int = int(bot.get("cp_cost", 1))
+			var suffix: String = Inventory.format_mineral_suffix(
+				bot.get("mineral_profile", {}),
+				bot.get("void_resolved", []),
+			)
+			var labeled: String = dname if suffix.is_empty() else "%s %s" % [dname, suffix]
 			var row: HBoxContainer = HBoxContainer.new()
 			row.add_theme_constant_override("separation", 8)
 			var cb: CheckBox = CheckBox.new()
-			cb.text = "%s  (CP %d)" % [dname, cost]
+			cb.text = "%s  (CP %d)" % [labeled, cost]
 			cb.button_pressed = bool(_party_selection.get(id, false))
 			var id_captured: String = id
 			var cost_captured: int = cost
