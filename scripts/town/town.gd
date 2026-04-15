@@ -237,9 +237,9 @@ func _open_mine_panel() -> void:
 	_wire_mine_panel_focus_wrap()
 	# Focus first option button so keyboard/gamepad can activate it
 	if mine_panel_option_buttons.size() > 0:
-		mine_panel_option_buttons[0].grab_focus()
+		mine_panel_option_buttons[0].call_deferred("grab_focus")
 	elif mine_panel_enter_button:
-		mine_panel_enter_button.grab_focus()
+		mine_panel_enter_button.call_deferred("grab_focus")
 
 
 func _wire_mine_panel_focus_wrap() -> void:
@@ -630,9 +630,9 @@ func _open_storage_panel() -> void:
 	get_tree().paused = true
 	_refresh_storage_panel()
 	if storage_deposit_btn and not storage_deposit_btn.disabled:
-		storage_deposit_btn.grab_focus()
+		storage_deposit_btn.call_deferred("grab_focus")
 	elif storage_close_btn:
-		storage_close_btn.grab_focus()
+		storage_close_btn.call_deferred("grab_focus")
 
 
 func _close_storage_panel() -> void:

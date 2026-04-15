@@ -289,7 +289,7 @@ func _open_backpack() -> void:
 	# Pillar A: grid navigation is deferred (Pillar B), but ensure B-button
 	# has a focus target so ui_cancel wiring does something predictable.
 	if _bp_close_btn:
-		_bp_close_btn.grab_focus()
+		_bp_close_btn.call_deferred("grab_focus")
 
 
 func _close_backpack() -> void:
@@ -443,7 +443,7 @@ func _populate_inspect_popup() -> void:
 		close_only.custom_minimum_size = Vector2(0, INSPECT_BUTTON_MIN_H)
 		close_only.pressed.connect(_close_inspect_popup)
 		vbox.add_child(close_only)
-		close_only.grab_focus()
+		close_only.call_deferred("grab_focus")
 		return
 	var ore: OreData = slot.ore
 	var mineral: MineralData = slot.mineral
@@ -488,7 +488,7 @@ func _populate_inspect_popup() -> void:
 	close_button_inner.pressed.connect(_close_inspect_popup)
 	button_row.add_child(close_button_inner)
 	FocusUtil.wire_vertical_wrap([drop_button, close_button_inner])
-	drop_button.grab_focus()
+	drop_button.call_deferred("grab_focus")
 
 
 func _center_inspect_popup() -> void:
@@ -721,11 +721,11 @@ func _populate_merge_list() -> void:
 	# Focus wrap + initial focus
 	FocusUtil.wire_vertical_wrap([upper_btn, lower_btn, cancel_btn])
 	if not upper_btn.disabled:
-		upper_btn.grab_focus()
+		upper_btn.call_deferred("grab_focus")
 	elif not lower_btn.disabled:
-		lower_btn.grab_focus()
+		lower_btn.call_deferred("grab_focus")
 	else:
-		cancel_btn.grab_focus()
+		cancel_btn.call_deferred("grab_focus")
 
 
 func _open_merge_panel() -> void:

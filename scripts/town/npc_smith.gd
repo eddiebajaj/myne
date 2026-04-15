@@ -184,12 +184,12 @@ func _focus_first_button() -> void:
 		if child is HBoxContainer:
 			for sub in child.get_children():
 				if sub is Button:
-					sub.grab_focus()
+					sub.call_deferred("grab_focus")
 					return
 		if child is Button:
-			child.grab_focus()
+			child.call_deferred("grab_focus")
 			return
-	close_button.grab_focus()
+	close_button.call_deferred("grab_focus")
 
 
 func _on_body_entered(body: Node2D) -> void:

@@ -164,9 +164,9 @@ func _refresh_common() -> void:
 func _focus_first_button() -> void:
 	for child in services_container.get_children():
 		if child is Button and not child.disabled:
-			child.grab_focus()
+			child.call_deferred("grab_focus")
 			return
-	close_button.grab_focus()
+	close_button.call_deferred("grab_focus")
 
 
 # ── Main view ───────────────────────────────────────────────────────
