@@ -135,7 +135,14 @@ func _show_view(view: LabView) -> void:
 		LabView.UPGRADE_BOTS: _build_upgrade_bots_view()
 		LabView.UPGRADE_NECKLACE: _build_upgrade_necklace_view()
 		LabView.UPGRADE_MERGE: _build_upgrade_merge_view()
+	_wire_focus_wrap()
 	_focus_first_button()
+
+
+func _wire_focus_wrap() -> void:
+	var focusables: Array = FocusUtil.collect_focusables(services_container)
+	focusables.append(close_button)
+	FocusUtil.wire_vertical_wrap(focusables)
 
 
 func _refresh_common() -> void:

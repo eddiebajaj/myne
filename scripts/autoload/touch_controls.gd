@@ -30,6 +30,11 @@ signal action_b_pressed
 signal action_y_pressed
 signal action_x_pressed
 var _action_press_frame: Dictionary = {}  # action_name -> last frame pressed (debounce)
+
+## Joystick → UI nav state (only used when get_tree().paused == true)
+const JOY_UI_ACTIVATE := 0.5
+const JOY_UI_RELEASE := 0.3
+var _joy_ui_axis_state: Vector2i = Vector2i.ZERO  # Current "pressed" state per axis (-1/0/+1)
 var _joy_touch_index: int = -1
 var _joy_center: Vector2 = Vector2.ZERO
 var _joy_knob: ColorRect = null
@@ -283,6 +288,15 @@ func _press_action(action_name: String, panel: Panel) -> void:
 	ev.pressed = true
 	ev.strength = 1.0
 	Input.parse_input_event(ev)
+	# Also inject the matching built-in UI action so Control nodes with
+	# focus (Buttons etc.) respond to A/B automatically.
+	var ui_action := _ui_action_for(action_name)
+	if ui_action != "":
+		var ui_ev := InputEventAction.new()
+		ui_ev.action = ui_action
+		ui_ev.pressed = true
+		ui_ev.strength = 1.0
+		Input.parse_input_event(ui_ev)
 	# Emit signal for reliable detection — consumers connect to these
 	if action_name == "action_a":
 		action_a_pressed.emit()
@@ -300,3 +314,67 @@ func _release_action(action_name: String, panel: Panel) -> void:
 	ev.action = action_name
 	ev.pressed = false
 	Input.parse_input_event(ev)
+	var ui_action := _ui_action_for(action_name)
+	if ui_action != "":
+		var ui_ev := InputEventAction.new()
+		ui_ev.action = ui_action
+		ui_ev.pressed = false
+		Input.parse_input_event(ui_ev)
+
+
+func _ui_action_for(action_name: String) -> String:
+	match action_name:
+		"action_a": return "ui_accept"
+		"action_b": return "ui_cancel"
+	return ""
+
+
+# ─── Joystick → UI directional nav (Sprint 6 Pillar A) ───────────────
+
+func _process(_delta: float) -> void:
+	if get_tree().paused:
+		_process_ui_joystick()
+	else:
+		# Outside UI mode, clear state so first deflection next time fires fresh.
+		if _joy_ui_axis_state != Vector2i.ZERO:
+			_joy_ui_axis_state = Vector2i.ZERO
+
+
+func _process_ui_joystick() -> void:
+	# X axis
+	var new_x: int = _joy_ui_axis_state.x
+	if _joy_ui_axis_state.x == 0:
+		if joystick_dir.x > JOY_UI_ACTIVATE:
+			new_x = 1
+			_fire_ui_direction("ui_right")
+		elif joystick_dir.x < -JOY_UI_ACTIVATE:
+			new_x = -1
+			_fire_ui_direction("ui_left")
+	else:
+		if absf(joystick_dir.x) < JOY_UI_RELEASE:
+			new_x = 0
+	# Y axis
+	var new_y: int = _joy_ui_axis_state.y
+	if _joy_ui_axis_state.y == 0:
+		if joystick_dir.y > JOY_UI_ACTIVATE:
+			new_y = 1
+			_fire_ui_direction("ui_down")
+		elif joystick_dir.y < -JOY_UI_ACTIVATE:
+			new_y = -1
+			_fire_ui_direction("ui_up")
+	else:
+		if absf(joystick_dir.y) < JOY_UI_RELEASE:
+			new_y = 0
+	_joy_ui_axis_state = Vector2i(new_x, new_y)
+
+
+func _fire_ui_direction(action: String) -> void:
+	var press := InputEventAction.new()
+	press.action = action
+	press.pressed = true
+	press.strength = 1.0
+	Input.parse_input_event(press)
+	var release := InputEventAction.new()
+	release.action = action
+	release.pressed = false
+	Input.parse_input_event(release)

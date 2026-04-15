@@ -39,6 +39,7 @@ var _bp_gold_label: Label = null
 var _bp_battery_label: Label = null  # Repurposed: merge charge readout inside backpack
 var _bp_followers_header: Label = null
 var _bp_followers_list: VBoxContainer = null
+var _bp_close_btn: Button = null
 
 # Inspect popup state
 var _inspect_popup: PanelContainer = null
@@ -270,11 +271,11 @@ func _build_backpack_ui() -> void:
 	side.add_child(_bp_followers_list)
 
 	# Close button
-	var close_btn := Button.new()
-	close_btn.text = "Close"
-	close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
-	close_btn.pressed.connect(_close_backpack)
-	vbox.add_child(close_btn)
+	_bp_close_btn = Button.new()
+	_bp_close_btn.text = "Close"
+	_bp_close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	_bp_close_btn.pressed.connect(_close_backpack)
+	vbox.add_child(_bp_close_btn)
 
 
 func _open_backpack() -> void:
@@ -285,6 +286,10 @@ func _open_backpack() -> void:
 	backpack_container.visible = true
 	get_tree().paused = true
 	_refresh_bp()
+	# Pillar A: grid navigation is deferred (Pillar B), but ensure B-button
+	# has a focus target so ui_cancel wiring does something predictable.
+	if _bp_close_btn:
+		_bp_close_btn.grab_focus()
 
 
 func _close_backpack() -> void:
@@ -438,6 +443,7 @@ func _populate_inspect_popup() -> void:
 		close_only.custom_minimum_size = Vector2(0, INSPECT_BUTTON_MIN_H)
 		close_only.pressed.connect(_close_inspect_popup)
 		vbox.add_child(close_only)
+		close_only.grab_focus()
 		return
 	var ore: OreData = slot.ore
 	var mineral: MineralData = slot.mineral
@@ -481,6 +487,8 @@ func _populate_inspect_popup() -> void:
 	close_button_inner.custom_minimum_size = Vector2(140, INSPECT_BUTTON_MIN_H)
 	close_button_inner.pressed.connect(_close_inspect_popup)
 	button_row.add_child(close_button_inner)
+	FocusUtil.wire_vertical_wrap([drop_button, close_button_inner])
+	drop_button.grab_focus()
 
 
 func _center_inspect_popup() -> void:
@@ -709,6 +717,15 @@ func _populate_merge_list() -> void:
 	cancel_btn.text = "Cancel"
 	cancel_btn.pressed.connect(_close_merge_panel)
 	_merge_list.add_child(cancel_btn)
+
+	# Focus wrap + initial focus
+	FocusUtil.wire_vertical_wrap([upper_btn, lower_btn, cancel_btn])
+	if not upper_btn.disabled:
+		upper_btn.grab_focus()
+	elif not lower_btn.disabled:
+		lower_btn.grab_focus()
+	else:
+		cancel_btn.grab_focus()
 
 
 func _open_merge_panel() -> void:

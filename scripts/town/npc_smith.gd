@@ -77,6 +77,12 @@ func _open_menu() -> void:
 	_focus_first_button()
 
 
+func _wire_focus_wrap() -> void:
+	var focusables: Array = FocusUtil.collect_focusables(upgrades_container)
+	focusables.append(close_button)
+	FocusUtil.wire_vertical_wrap(focusables)
+
+
 func _close_menu() -> void:
 	menu_open = false
 	menu_panel.visible = false
@@ -144,6 +150,7 @@ func _refresh_ui() -> void:
 		upgrades_container.add_child(current_lbl)
 	else:
 		_add_max_row("Backpack: MAX (%d slots)" % (Inventory.grid_width * current_rows))
+	_wire_focus_wrap()
 
 
 func _add_header(text: String) -> void:

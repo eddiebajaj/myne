@@ -83,8 +83,13 @@ func _open_menu() -> void:
 	get_tree().paused = true
 	_refresh_ui()
 	menu_opened.emit()
+	# Wire focus wrap across the two live buttons.
+	FocusUtil.wire_vertical_wrap([sell_button, close_button])
 	# Focus first interactive button so keyboard/gamepad can activate it
-	sell_button.grab_focus()
+	if sell_button.disabled:
+		close_button.grab_focus()
+	else:
+		sell_button.grab_focus()
 
 
 func _close_menu() -> void:

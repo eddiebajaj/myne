@@ -38,6 +38,7 @@ const MAX_FLOOR := 20
 
 
 func _ready() -> void:
+	ThemeSetup.apply_focus_theme()
 	state_changed.emit(current_state)
 
 

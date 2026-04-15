@@ -234,11 +234,33 @@ func _open_mine_panel() -> void:
 	mine_panel.visible = true
 	mine_panel_dim.visible = true
 	get_tree().paused = true
+	_wire_mine_panel_focus_wrap()
 	# Focus first option button so keyboard/gamepad can activate it
 	if mine_panel_option_buttons.size() > 0:
 		mine_panel_option_buttons[0].grab_focus()
 	elif mine_panel_enter_button:
 		mine_panel_enter_button.grab_focus()
+
+
+func _wire_mine_panel_focus_wrap() -> void:
+	var focusables: Array = []
+	for btn in mine_panel_option_buttons:
+		focusables.append(btn)
+	if mine_panel_party_container:
+		for row in mine_panel_party_container.get_children():
+			if row is HBoxContainer:
+				for sub in row.get_children():
+					if sub is CheckBox:
+						focusables.append(sub)
+	if mine_panel_enter_button:
+		focusables.append(mine_panel_enter_button)
+	# Close button is the last child of the root vbox; find it.
+	var vbox: VBoxContainer = mine_panel.get_child(0) as VBoxContainer
+	if vbox:
+		for c in vbox.get_children():
+			if c is Button and c != mine_panel_enter_button:
+				focusables.append(c)
+	FocusUtil.wire_vertical_wrap(focusables)
 
 
 func _init_party_selection_default() -> void:
@@ -285,6 +307,8 @@ func _refresh_mine_panel_party() -> void:
 			row.add_child(cb)
 			mine_panel_party_container.add_child(row)
 	_update_party_summary_and_locks()
+	if mine_panel_open:
+		_wire_mine_panel_focus_wrap()
 
 
 func _on_party_checkbox_toggled(id: String, cost: int, pressed: bool) -> void:
@@ -463,6 +487,8 @@ var storage_backpack_list: VBoxContainer = null
 var storage_storage_list: VBoxContainer = null
 var storage_storage_header: Label = null
 var storage_result_label: Label = null
+var storage_deposit_btn: Button = null
+var storage_close_btn: Button = null
 
 
 func _build_storage_shed() -> void:
@@ -572,20 +598,20 @@ func _build_storage_panel() -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	var deposit_btn := Button.new()
-	deposit_btn.text = "Deposit All"
-	deposit_btn.pressed.connect(_on_storage_deposit_all)
-	vbox.add_child(deposit_btn)
+	storage_deposit_btn = Button.new()
+	storage_deposit_btn.text = "Deposit All"
+	storage_deposit_btn.pressed.connect(_on_storage_deposit_all)
+	vbox.add_child(storage_deposit_btn)
 
 	storage_result_label = Label.new()
 	storage_result_label.text = ""
 	storage_result_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(storage_result_label)
 
-	var close_btn := Button.new()
-	close_btn.text = "Close"
-	close_btn.pressed.connect(_close_storage_panel)
-	vbox.add_child(close_btn)
+	storage_close_btn = Button.new()
+	storage_close_btn.text = "Close"
+	storage_close_btn.pressed.connect(_close_storage_panel)
+	vbox.add_child(storage_close_btn)
 
 	storage_panel.visible = false
 	storage_panel_dim.visible = false
@@ -603,6 +629,10 @@ func _open_storage_panel() -> void:
 	storage_panel_dim.visible = true
 	get_tree().paused = true
 	_refresh_storage_panel()
+	if storage_deposit_btn and not storage_deposit_btn.disabled:
+		storage_deposit_btn.grab_focus()
+	elif storage_close_btn:
+		storage_close_btn.grab_focus()
 
 
 func _close_storage_panel() -> void:
@@ -657,6 +687,16 @@ func _refresh_storage_panel() -> void:
 			btn.pressed.connect(func(): _on_storage_withdraw_one(ore_id, mineral_id))
 			row.add_child(btn)
 			storage_storage_list.add_child(row)
+	_wire_storage_focus_wrap()
+
+
+func _wire_storage_focus_wrap() -> void:
+	var focusables: Array = FocusUtil.collect_focusables(storage_storage_list)
+	if storage_deposit_btn:
+		focusables.append(storage_deposit_btn)
+	if storage_close_btn:
+		focusables.append(storage_close_btn)
+	FocusUtil.wire_vertical_wrap(focusables)
 
 
 func _storage_stack_name(slot: Dictionary) -> String:
