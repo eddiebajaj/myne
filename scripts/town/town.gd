@@ -697,11 +697,27 @@ func _refresh_storage_panel() -> void:
 
 func _wire_storage_focus_wrap() -> void:
 	var focusables: Array = FocusUtil.collect_focusables(storage_storage_list)
+	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
 	if storage_deposit_btn:
 		focusables.append(storage_deposit_btn)
 	if storage_close_btn:
 		focusables.append(storage_close_btn)
 	FocusUtil.wire_vertical_wrap(focusables)
+
+
+func _focus_first_storage_button() -> void:
+	## Re-grab focus after storage panel rebuild (deposit/withdraw).
+	var focusables: Array = FocusUtil.collect_focusables(storage_storage_list)
+	for ctrl in focusables:
+		if ctrl.is_queued_for_deletion():
+			continue
+		if ctrl is Button and not ctrl.disabled:
+			ctrl.call_deferred("grab_focus")
+			return
+	if storage_deposit_btn and not storage_deposit_btn.disabled:
+		storage_deposit_btn.call_deferred("grab_focus")
+	elif storage_close_btn:
+		storage_close_btn.call_deferred("grab_focus")
 
 
 func _storage_stack_name(slot: Dictionary) -> String:
@@ -718,6 +734,7 @@ func _on_storage_deposit_all() -> void:
 	else:
 		storage_result_label.text = "Nothing to deposit (or storage full)."
 	_refresh_storage_panel()
+	_focus_first_storage_button()
 
 
 func _on_storage_withdraw_one(ore_id: String, mineral_id: String) -> void:
@@ -726,3 +743,4 @@ func _on_storage_withdraw_one(ore_id: String, mineral_id: String) -> void:
 	else:
 		storage_result_label.text = "Backpack full or item missing."
 	_refresh_storage_panel()
+	_focus_first_storage_button()

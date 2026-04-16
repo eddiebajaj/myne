@@ -79,6 +79,7 @@ func _open_menu() -> void:
 
 func _wire_focus_wrap() -> void:
 	var focusables: Array = FocusUtil.collect_focusables(upgrades_container)
+	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
 	focusables.append(close_button)
 	FocusUtil.wire_vertical_wrap(focusables)
 
@@ -151,6 +152,7 @@ func _refresh_ui() -> void:
 	else:
 		_add_max_row("Backpack: MAX (%d slots)" % (Inventory.grid_width * current_rows))
 	_wire_focus_wrap()
+	_focus_first_button()
 
 
 func _add_header(text: String) -> void:
@@ -180,14 +182,14 @@ func _add_buy_row(desc: String, cost: int, on_buy: Callable) -> void:
 
 
 func _focus_first_button() -> void:
-	for child in upgrades_container.get_children():
-		if child is HBoxContainer:
-			for sub in child.get_children():
-				if sub is Button:
-					sub.call_deferred("grab_focus")
-					return
-		if child is Button:
-			child.call_deferred("grab_focus")
+	# Use FocusUtil for nested buttons; skip queued-for-deletion nodes left by
+	# _refresh_ui's queue_free() pass (they're still in the tree this frame).
+	var focusables := FocusUtil.collect_focusables(upgrades_container)
+	for ctrl in focusables:
+		if ctrl.is_queued_for_deletion():
+			continue
+		if not ctrl.disabled:
+			ctrl.call_deferred("grab_focus")
 			return
 	close_button.call_deferred("grab_focus")
 

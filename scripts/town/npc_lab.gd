@@ -152,6 +152,8 @@ func _show_view(view: LabView) -> void:
 
 func _wire_focus_wrap() -> void:
 	var focusables: Array = FocusUtil.collect_focusables(services_container)
+	# Filter out nodes queued for deletion (old view children not yet freed).
+	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
 	focusables.append(close_button)
 	FocusUtil.wire_vertical_wrap(focusables)
 
@@ -173,9 +175,15 @@ func _refresh_common() -> void:
 
 
 func _focus_first_button() -> void:
-	for child in services_container.get_children():
-		if child is Button and not child.disabled:
-			child.call_deferred("grab_focus")
+	# Use FocusUtil to find buttons in nested sub-containers (e.g. BOT_CRAFT
+	# two-column layout).  Skip nodes queued for deletion — _show_view
+	# queue_free()s old children before building new ones in the same frame.
+	var focusables := FocusUtil.collect_focusables(services_container)
+	for ctrl in focusables:
+		if ctrl.is_queued_for_deletion():
+			continue
+		if not ctrl.disabled:
+			ctrl.call_deferred("grab_focus")
 			return
 	close_button.call_deferred("grab_focus")
 
