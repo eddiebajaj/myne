@@ -102,7 +102,7 @@ func _close_menu() -> void:
 #  Sell actions
 # ---------------------------------------------------------------------------
 
-func _on_sell_selected() -> void:
+func _on_sell_selected(restore_focus_index: int = -1) -> void:
 	if _sell_slot.is_empty():
 		result_label.text = "Nothing selected."
 		return
@@ -123,17 +123,18 @@ func _on_sell_selected() -> void:
 		_spawn_gold_popup(total_gold)
 	else:
 		result_label.text = "Nothing to sell."
-	_refresh_ui()
+	_refresh_ui(restore_focus_index)
 
 
 func _on_sell_all() -> void:
 	## Fill the sell slot with every available ore, then immediately sell.
+	var focus_idx: int = _get_focused_button_index()
 	_sell_slot.clear()
 	var stacks: Array = _collect_inventory_stacks()
 	for stack in stacks:
 		var key: String = _ore_key(stack.ore, stack.mineral)
 		_sell_slot[key] = {"ore": stack.ore, "mineral": stack.mineral, "count": int(stack.quantity)}
-	_on_sell_selected()
+	_on_sell_selected(focus_idx)
 
 
 func _add_one_to_slot(ore: OreData, mineral: MineralData) -> void:
@@ -143,33 +144,35 @@ func _add_one_to_slot(ore: OreData, mineral: MineralData) -> void:
 	var already: int = int(_sell_slot[key].count) if _sell_slot.has(key) else 0
 	if already >= available:
 		return
+	var focus_idx: int = _get_focused_button_index()
 	if _sell_slot.has(key):
 		_sell_slot[key].count = already + 1
 	else:
 		_sell_slot[key] = {"ore": ore, "mineral": mineral, "count": 1}
-	_refresh_ui()
+	_refresh_ui(focus_idx)
 
 
 func _remove_one_from_slot(ore: OreData, mineral: MineralData) -> void:
 	var key: String = _ore_key(ore, mineral)
 	if not _sell_slot.has(key):
 		return
+	var focus_idx: int = _get_focused_button_index()
 	_sell_slot[key].count = int(_sell_slot[key].count) - 1
 	if int(_sell_slot[key].count) <= 0:
 		_sell_slot.erase(key)
-	_refresh_ui()
+	_refresh_ui(focus_idx)
 
 
 # ---------------------------------------------------------------------------
 #  UI rebuild
 # ---------------------------------------------------------------------------
 
-func _refresh_ui() -> void:
+func _refresh_ui(restore_focus_index: int = -1) -> void:
 	gold_label.text = "Gold: %d" % GameManager.gold
-	_refresh_breakdown()
+	_refresh_breakdown(restore_focus_index)
 
 
-func _refresh_breakdown() -> void:
+func _refresh_breakdown(restore_focus_index: int = -1) -> void:
 	if _breakdown_container == null:
 		return
 	for child in _breakdown_container.get_children():
@@ -271,15 +274,39 @@ func _refresh_breakdown() -> void:
 	btn_row.add_child(cancel_btn)
 
 	# --- Focus wiring ---
-	_wire_focus()
+	_wire_focus(restore_focus_index)
 
 
-func _wire_focus() -> void:
+func _wire_focus(restore_focus_index: int = -1) -> void:
 	var focusables: Array = FocusUtil.collect_focusables(_breakdown_container)
 	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
 	focusables.append(close_button)
 	FocusUtil.wire_vertical_wrap(focusables)
-	_grab_first_focus()
+	if restore_focus_index >= 0:
+		_focus_button_at_index(restore_focus_index)
+	else:
+		_grab_first_focus()
+
+
+func _get_focused_button_index() -> int:
+	var focused := _breakdown_container.get_viewport().gui_get_focus_owner()
+	if focused == null:
+		return -1
+	var focusables: Array = FocusUtil.collect_focusables(_breakdown_container)
+	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
+	focusables.append(close_button)
+	return focusables.find(focused)
+
+
+func _focus_button_at_index(idx: int) -> void:
+	var focusables: Array = FocusUtil.collect_focusables(_breakdown_container)
+	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
+	focusables.append(close_button)
+	if focusables.is_empty():
+		close_button.call_deferred("grab_focus")
+		return
+	idx = clampi(idx, 0, focusables.size() - 1)
+	focusables[idx].call_deferred("grab_focus")
 
 
 func _grab_first_focus() -> void:

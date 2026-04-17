@@ -28,6 +28,25 @@ const BOT_BUILD_SPECS: Dictionary = {
 	                "desc": "Ranged combat support. 40 HP, 5 DMG."},
 }
 
+# --- Hard material requirements per bot type (Sprint 8) ---
+# Each entry: array of {ore_id, mineral_id, count}.
+# These count toward the point total — they are not extra.
+const BOT_REQUIRED_MATERIALS: Dictionary = {
+	"miner": [
+		{"ore_id": "iron", "mineral_id": "", "count": 3},
+	],
+	"striker": [
+		{"ore_id": "copper", "mineral_id": "", "count": 3},
+	],
+	"backpack_bot": [
+		{"ore_id": "iron", "mineral_id": "", "count": 2},
+		{"ore_id": "copper", "mineral_id": "", "count": 2},
+	],
+	"scout": [
+		{"ore_id": "crystal", "mineral_id": "", "count": 2},
+	],
+}
+
 # --- Bot upgrade scaling ---
 const BOT_UPGRADE_BASE_ORE := 15
 const BOT_UPGRADE_BASE_GOLD := 150
@@ -134,7 +153,7 @@ func _close_menu() -> void:
 
 # ── View dispatch ───────────────────────────────────────────────────
 
-func _show_view(view: LabView) -> void:
+func _show_view(view: LabView, restore_focus_index: int = -1) -> void:
 	_view = view
 	_refresh_common()
 	for child in services_container.get_children():
@@ -147,7 +166,10 @@ func _show_view(view: LabView) -> void:
 		LabView.UPGRADE_NECKLACE: _build_upgrade_necklace_view()
 		LabView.UPGRADE_MERGE: _build_upgrade_merge_view()
 	_wire_focus_wrap()
-	_focus_first_button()
+	if restore_focus_index >= 0:
+		_focus_button_at_index(restore_focus_index)
+	else:
+		_focus_first_button()
 
 
 func _wire_focus_wrap() -> void:
@@ -172,6 +194,27 @@ func _refresh_common() -> void:
 		for nm in counts:
 			parts.append("%s x%d" % [nm, counts[nm]])
 		storage_label.text = "Stored Minerals: " + ", ".join(parts)
+
+
+func _get_focused_button_index() -> int:
+	var focused := services_container.get_viewport().gui_get_focus_owner()
+	if focused == null:
+		return -1
+	var focusables := FocusUtil.collect_focusables(services_container)
+	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
+	focusables.append(close_button)
+	return focusables.find(focused)
+
+
+func _focus_button_at_index(idx: int) -> void:
+	var focusables := FocusUtil.collect_focusables(services_container)
+	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
+	focusables.append(close_button)
+	if focusables.is_empty():
+		close_button.call_deferred("grab_focus")
+		return
+	idx = clampi(idx, 0, focusables.size() - 1)
+	focusables[idx].call_deferred("grab_focus")
 
 
 func _focus_first_button() -> void:
@@ -346,6 +389,23 @@ func _build_bot_craft_view() -> void:
 		total_lbl.add_theme_color_override("font_color", Color(0.6, 0.95, 0.6))
 	services_container.add_child(total_lbl)
 
+	# Required materials display
+	var reqs: Array = BOT_REQUIRED_MATERIALS.get(_craft_bot_id, [])
+	var reqs_met: bool = true
+	if not reqs.is_empty():
+		for req in reqs:
+			var have: int = _count_ore_id_in_build_slot(req.ore_id, req.mineral_id)
+			var needed: int = int(req.count)
+			var mat_name: String = _get_required_materials_display_name(req.ore_id, req.mineral_id)
+			var req_lbl: Label = Label.new()
+			req_lbl.text = "Requires: %dx %s (%d/%d)" % [needed, mat_name, have, needed]
+			if have >= needed:
+				req_lbl.add_theme_color_override("font_color", Color(0.6, 0.95, 0.6))
+			else:
+				req_lbl.add_theme_color_override("font_color", Color(0.95, 0.4, 0.4))
+				reqs_met = false
+			services_container.add_child(req_lbl)
+
 	var bonus_lbl: Label = Label.new()
 	bonus_lbl.text = "Bonuses: " + _bonus_preview_text()
 	services_container.add_child(bonus_lbl)
@@ -358,7 +418,7 @@ func _build_bot_craft_view() -> void:
 
 	var build_btn: Button = Button.new()
 	build_btn.text = "Build %s" % dname
-	build_btn.disabled = total_pts < Inventory.BOT_BUILD_THRESHOLD
+	build_btn.disabled = total_pts < Inventory.BOT_BUILD_THRESHOLD or not reqs_met
 	build_btn.pressed.connect(_craft_build)
 	services_container.add_child(build_btn)
 
@@ -423,25 +483,63 @@ func _build_slot_total_points() -> int:
 	return total
 
 
+func _count_ore_id_in_build_slot(ore_id: String, mineral_id: String) -> int:
+	## Count how many of a specific ore_id (with optional mineral_id) are in the build slot.
+	## mineral_id "" matches only plain ore (no mineral).
+	var total: int = 0
+	for k in _build_slot.keys():
+		var entry: Dictionary = _build_slot[k]
+		var entry_mineral_id: String = entry.mineral.id if entry.mineral else ""
+		if entry.ore.id == ore_id and entry_mineral_id == mineral_id:
+			total += int(entry.count)
+	return total
+
+
+func _check_required_materials() -> bool:
+	## Returns true if all required materials for _craft_bot_id are present in _build_slot.
+	var reqs: Array = BOT_REQUIRED_MATERIALS.get(_craft_bot_id, [])
+	for req in reqs:
+		var have: int = _count_ore_id_in_build_slot(req.ore_id, req.mineral_id)
+		if have < int(req.count):
+			return false
+	return true
+
+
+func _get_required_materials_display_name(ore_id: String, mineral_id: String) -> String:
+	## Human-readable name for a required material.
+	# Map known ore_ids to display names.
+	var names: Dictionary = {
+		"iron": "Iron", "copper": "Copper", "crystal": "Crystal",
+		"silver": "Silver", "gold_ore": "Gold", "obsidian": "Obsidian",
+		"diamond": "Diamond", "mythril": "Mythril",
+	}
+	var base: String = names.get(ore_id, ore_id.capitalize())
+	if mineral_id != "":
+		return "%s (%s)" % [base, mineral_id.capitalize()]
+	return base
+
+
 func _craft_add_one(ore: OreData, mineral: MineralData) -> void:
 	var key: String = _ore_key(ore, mineral)
 	var available: int = Inventory.count_ore_combined(ore.id, mineral.id if mineral else "")
 	if _build_slot_count_for(key) >= available:
 		return
+	var focus_idx: int = _get_focused_button_index()
 	if _build_slot.has(key):
 		_build_slot[key].count = int(_build_slot[key].count) + 1
 	else:
 		_build_slot[key] = {"ore": ore, "mineral": mineral, "count": 1}
-	_show_view(LabView.BOT_CRAFT)
+	_show_view(LabView.BOT_CRAFT, focus_idx)
 
 
 func _craft_remove_one(ore_key: String) -> void:
 	if not _build_slot.has(ore_key):
 		return
+	var focus_idx: int = _get_focused_button_index()
 	_build_slot[ore_key].count = int(_build_slot[ore_key].count) - 1
 	if int(_build_slot[ore_key].count) <= 0:
 		_build_slot.erase(ore_key)
-	_show_view(LabView.BOT_CRAFT)
+	_show_view(LabView.BOT_CRAFT, focus_idx)
 
 
 func _compute_raw_mineral_profile() -> Dictionary:
@@ -477,10 +575,41 @@ func _bonus_preview_text() -> String:
 
 
 func _craft_auto_assign() -> void:
-	## Greedy fill (spec §A7): cheapest first, plain before mineral within a tier.
+	## Greedy fill: required materials first, then cheapest to reach threshold.
 	_build_slot.clear()
 	var stacks: Array = _collect_inventory_stacks()
-	# Sort: tier ascending, then plain (mineral == null) before mineral.
+
+	# Phase 1: Fill required materials first.
+	var reqs: Array = BOT_REQUIRED_MATERIALS.get(_craft_bot_id, [])
+	# Track how many of each stack we've consumed (by key) so greedy phase skips them.
+	var consumed: Dictionary = {}  # ore_key -> int
+	for req in reqs:
+		var needed: int = int(req.count)
+		var target_ore_id: String = req.ore_id
+		var target_mineral_id: String = req.mineral_id
+		# Find matching stacks (prefer plain ore matching the requirement).
+		for stack in stacks:
+			if needed <= 0:
+				break
+			var ore: OreData = stack.ore
+			var mineral: MineralData = stack.mineral
+			var stack_mineral_id: String = mineral.id if mineral else ""
+			if ore.id != target_ore_id or stack_mineral_id != target_mineral_id:
+				continue
+			var key: String = _ore_key(ore, mineral)
+			var already_used: int = consumed.get(key, 0)
+			var avail: int = int(stack.quantity) - already_used
+			var take: int = mini(avail, needed)
+			if take <= 0:
+				continue
+			if _build_slot.has(key):
+				_build_slot[key].count = int(_build_slot[key].count) + take
+			else:
+				_build_slot[key] = {"ore": ore, "mineral": mineral, "count": take}
+			consumed[key] = already_used + take
+			needed -= take
+
+	# Phase 2: Greedy fill remaining points (cheapest first, plain before mineral).
 	stacks.sort_custom(func(a, b):
 		var ta: int = int(a.ore.tier)
 		var tb: int = int(b.ore.tier)
@@ -492,13 +621,13 @@ func _craft_auto_assign() -> void:
 			return a_plain  # plain first
 		return false
 	)
-	var running: int = 0
+	var running: int = _build_slot_total_points()
 	for stack in stacks:
 		if running >= Inventory.BOT_BUILD_THRESHOLD:
 			break
 		var ore: OreData = stack.ore
 		var mineral: MineralData = stack.mineral
-		var qty: int = int(stack.quantity)
+		var qty: int = int(stack.quantity) - consumed.get(_ore_key(ore, mineral), 0)
 		var pts: int = _points_for_tier(int(ore.tier))
 		var key: String = _ore_key(ore, mineral)
 		while qty > 0 and running < Inventory.BOT_BUILD_THRESHOLD:
@@ -508,7 +637,8 @@ func _craft_auto_assign() -> void:
 				_build_slot[key] = {"ore": ore, "mineral": mineral, "count": 1}
 			qty -= 1
 			running += pts
-	_show_view(LabView.BOT_CRAFT)
+	var focus_idx: int = _get_focused_button_index()
+	_show_view(LabView.BOT_CRAFT, focus_idx)
 
 
 func _craft_build() -> void:
@@ -516,6 +646,11 @@ func _craft_build() -> void:
 	var total_pts: int = _build_slot_total_points()
 	if total_pts < Inventory.BOT_BUILD_THRESHOLD:
 		return  # Defensive: button should be disabled.
+
+	if not _check_required_materials():
+		push_error("npc_lab: _craft_build called without required materials for %s — build aborted" % _craft_bot_id)
+		result_label.text = "Build failed: missing required materials."
+		return
 
 	# 1. Spend ores. Snapshot entries first so we can abort cleanly on failure.
 	var spend_list: Array = []
