@@ -10,7 +10,11 @@ extends HBoxContainer
 ##   bar.set_active("build")
 ##
 ## Navigation:
-##   - ui_left / ui_right cycle active tab (wrap-around) when a tab button has focus
+##   - tab_prev / tab_next (LB/RB, Q/E, Shift+Tab/Tab) cycle active tab with
+##     wrap-around. Handled via _unhandled_input so it works regardless of
+##     whether focus is on the tab bar or the content below.
+##   - ui_left / ui_right do NOT cycle tabs (joystick left/right on content
+##     is reserved for normal content navigation).
 ##   - ui_down moves focus into the content area — call wire_content_below(first_ctrl)
 ##     after you (re)build the content so the neighbor is correct
 ##   - ui_up from first content row returns focus to the active tab (caller's job)
@@ -32,7 +36,7 @@ var _tab_buttons: Array[Button] = []
 var _tab_labels: Array[String] = []
 var _active_index: int = -1
 var _content_first_control: Control = null
-# When locked, left/right cycling and tab-press activation are ignored and the
+# When locked, tab cycling and tab-press activation are ignored and the
 # bar dims to communicate inertness. Set by the host panel while a sub-view is
 # visible so the tab bar can't steal focus or switch tabs mid-interaction.
 var _locked: bool = false
@@ -50,9 +54,6 @@ func add_tab(id: String, label: String) -> void:
 	# Capture id so pressing the tab activates it.
 	var id_cap: String = id
 	btn.pressed.connect(func(): set_active(id_cap))
-	# Allow left/right to cycle via gui_input so we don't depend on Godot's
-	# neighbor wiring (which can be finicky when buttons are rebuilt).
-	btn.gui_input.connect(_on_tab_button_gui_input.bind(id_cap))
 	add_child(btn)
 	_tab_ids.append(id)
 	_tab_buttons.append(btn)
@@ -86,7 +87,7 @@ func set_active_index(i: int) -> void:
 
 
 func set_locked(locked: bool) -> void:
-	## When locked: left/right input and tab-button presses are ignored, and the
+	## When locked: tab cycling input and tab-button presses are ignored, and the
 	## bar is dimmed so the player can see switching is disabled. Used by the
 	## host panel while a sub-view (e.g. BUILD_CRAFT) is open.
 	if _locked == locked:
@@ -140,18 +141,22 @@ func wire_content_below(first_content_control: Control) -> void:
 
 # ── Internal ────────────────────────────────────────────────────────
 
-func _on_tab_button_gui_input(event: InputEvent, _id: String) -> void:
-	# is_action_pressed() is edge-triggered, so we don't need to filter releases.
+func _unhandled_input(event: InputEvent) -> void:
+	# tab_prev/tab_next fire at the node level so shoulder buttons (and Q/E)
+	# work whether focus is on the tab bar or inside content. Only act when the
+	# hosting panel is actually visible, and never while locked.
+	if not is_visible_in_tree():
+		return
 	if _locked:
-		# Still swallow the input so it doesn't fall through to other handlers,
-		# but do not cycle. Prevents tab switches while a sub-view is open.
-		if event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
+		# Still swallow so the input doesn't leak to other systems while a
+		# sub-view owns the panel.
+		if event.is_action_pressed("tab_prev") or event.is_action_pressed("tab_next"):
 			get_viewport().set_input_as_handled()
 		return
-	if event.is_action_pressed("ui_left"):
+	if event.is_action_pressed("tab_prev"):
 		_cycle(-1)
 		get_viewport().set_input_as_handled()
-	elif event.is_action_pressed("ui_right"):
+	elif event.is_action_pressed("tab_next"):
 		_cycle(1)
 		get_viewport().set_input_as_handled()
 
@@ -182,16 +187,15 @@ func _apply_visual_state() -> void:
 
 
 func _rewire_neighbors() -> void:
-	# Wire left/right as a ring. Godot will call focus_neighbor_left/right before
-	# it falls back to native hit-testing. We still have gui_input as a belt-and-
-	# suspenders for edge cases (e.g. single-tab setup, buttons rebuilt).
-	var n: int = _tab_buttons.size()
-	for i in range(n):
-		var btn: Button = _tab_buttons[i]
+	# Tab bar is NOT a ring under joystick navigation — left/right on a tab
+	# button does nothing (or falls through to whatever Godot's native traversal
+	# decides, typically nothing when no neighbors are set). Tab cycling is
+	# handled exclusively by the tab_prev/tab_next actions in _unhandled_input.
+	# Clear any left/right neighbor wiring so joystick left/right on the tab
+	# bar itself doesn't jump between tabs.
+	for btn in _tab_buttons:
 		if btn == null or btn.is_queued_for_deletion():
 			continue
-		var prev_btn: Button = _tab_buttons[(i - 1 + n) % n]
-		var next_btn: Button = _tab_buttons[(i + 1) % n]
-		btn.focus_neighbor_left = btn.get_path_to(prev_btn)
-		btn.focus_neighbor_right = btn.get_path_to(next_btn)
-		btn.focus_previous = btn.get_path_to(prev_btn)
+		btn.focus_neighbor_left = NodePath("")
+		btn.focus_neighbor_right = NodePath("")
+		btn.focus_previous = NodePath("")
