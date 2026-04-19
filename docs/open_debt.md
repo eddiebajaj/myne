@@ -25,10 +25,25 @@ Carried forward each sprint. Items are added when deferred, removed when resolve
 | D19 | Tetris-like backpack shapes | Sprint 5 | Medium | Eddie mentioned as upcoming |
 | D20 | Storage tabs / upgrade path | Sprint 5 | Low | Once base 48 slots fill up |
 | D21 | Rare bot blueprints (Guardian, Healer, Amplifier) | Sprint 5 | Medium | Need progression gates |
-| D22 | Bot upgrades using new crafting mechanic | Sprint 6 | High | Sprint 8 — old upgrade view hidden in Sprint 7 |
+| D22 | Bot upgrades using new crafting mechanic | Sprint 6 | High | Sprint 8 — old upgrade view disabled ("Coming Soon") in Sprint 7 |
 | D23 | Backpack grid navigation | Sprint 6 | Low | Deferred until tetris-like rework |
 | D24 | Bot rename UI | Sprint 7 | Low | Auto-numbering for now ("Scout #1") |
 | D25 | Sound effects (negative SFX, hit feedback) | Sprint 6 | Low | Future polish |
+| D26 | Hard material recipe balance | Sprint 7 | Medium | Values feel right at B1-B3, untested at depth or with multiple builds/run |
+| D27 | Void mineral never drops | Sprint 7 | Low | Not in `MineralData.get_all_minerals()`. Build-time data flow ready; activates when drops wired |
+| D28 | Ice/Thunder/Venom on-hit mechanics | Sprint 7 | Medium | Counts stored as bot meta; no runtime hit code consumes them yet |
+
+## Resolved (Sprint 7)
+
+| ID | Debt | Resolved In | How |
+|---|---|---|---|
+| — | Build-your-own-bot crafting (C1) | Sprint 7 | Point system + recipe UI + multi-instance bots |
+| — | Mineral spawn rate ramp (C2) | Sprint 7 | 5/15/25% by floor depth |
+| — | Multi-instance permanent bots | Sprint 7 | Auto-numbered (Scout #1, Scout #2) |
+| — | Market sell-from-storage | Sprint 7 | Two-column manual selection UI |
+| — | Sub-menu focus loss on view transition | Sprint 7 | `is_queued_for_deletion()` filter |
+| — | Focus loss on add/remove in crafting | Sprint 7 | Index save/restore across rebuild |
+| — | Hard material per-bot identity | Sprint 7 | Iron/Copper/Crystal requirements per bot |
 
 ## Resolved (Sprint 5)
 

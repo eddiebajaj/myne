@@ -1,7 +1,10 @@
 name: Build and Deploy to itch.io
 
-# Run manually from GitHub Actions tab (no auto-deploy on push)
+# Auto-builds on push to main; manual trigger also available via Actions tab
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 env:

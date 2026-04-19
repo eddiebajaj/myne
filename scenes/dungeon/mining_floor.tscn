@@ -181,10 +181,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -350
-offset_top = -250
-offset_right = 350
-offset_bottom = 250
+offset_left = -400
+offset_top = -280
+offset_right = 400
+offset_bottom = 280
 visible = false
 
 [node name="MergePanel" type="PanelContainer" parent="CanvasLayer/MiningHUD"]

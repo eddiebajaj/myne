@@ -12,6 +12,7 @@ config/features=PackedStringArray("4.2", "GL Compatibility")
 
 GameManager="*res://scripts/autoload/game_manager.gd"
 Inventory="*res://scripts/autoload/inventory.gd"
+GameVersion="*res://scripts/autoload/game_version.gd"
 TouchControls="*res://scenes/ui/touch_controls.tscn"
 BackpackPanel="*res://scenes/ui/backpack_panel.tscn"
 

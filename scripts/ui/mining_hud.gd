@@ -37,9 +37,14 @@ var _bp_grid: GridContainer = null
 var _bp_capacity_label: Label = null
 var _bp_gold_label: Label = null
 var _bp_battery_label: Label = null  # Repurposed: merge charge readout inside backpack
-var _bp_followers_header: Label = null
-var _bp_followers_list: VBoxContainer = null
 var _bp_close_btn: Button = null
+
+# Sprint 8 §B1: tabbed backpack (Ores / Bots / Artifacts).
+var _bp_tab_bar: TabBarUI = null
+var _bp_content: VBoxContainer = null  # Rebuilt on tab change.
+var _bp_active_tab: String = "ores"
+
+const _BP_TAB_DEFAULT: String = "ores"
 
 # Inspect popup state
 var _inspect_popup: PanelContainer = null
@@ -214,22 +219,128 @@ func _build_backpack_ui() -> void:
 	vbox.add_theme_constant_override("separation", 8)
 	scroll.add_child(vbox)
 
-	# Header row
+	# Title row (capacity readout refreshed per Ores tab build).
 	var header := HBoxContainer.new()
 	vbox.add_child(header)
 	var title := Label.new()
 	title.text = "BACKPACK"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(title)
-	_bp_capacity_label = Label.new()
-	_bp_capacity_label.text = "0 / 0"
-	header.add_child(_bp_capacity_label)
 
-	# Body: grid + side panel
+	# Tab bar (Sprint 8 §B1): Ores / Bots / Artifacts.
+	_bp_tab_bar = TabBarUI.new()
+	_bp_tab_bar.name = "TabBar"
+	_bp_tab_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bp_tab_bar.add_tab("ores", "Ores")
+	_bp_tab_bar.add_tab("bots", "Bots")
+	_bp_tab_bar.add_tab("artifacts", "Artifacts")
+	_bp_tab_bar.tab_changed.connect(_on_bp_tab_changed)
+	vbox.add_child(_bp_tab_bar)
+
+	# Content area — swapped on every tab change.
+	_bp_content = VBoxContainer.new()
+	_bp_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bp_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_bp_content.add_theme_constant_override("separation", 8)
+	vbox.add_child(_bp_content)
+
+	# Close button — persistent below the tab content so B / the button both work.
+	_bp_close_btn = Button.new()
+	_bp_close_btn.text = "Close"
+	_bp_close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	_bp_close_btn.pressed.connect(_close_backpack)
+	vbox.add_child(_bp_close_btn)
+
+
+func _open_backpack() -> void:
+	if _backpack_open:
+		return
+	_close_merge_panel()
+	_backpack_open = true
+	backpack_container.visible = true
+	get_tree().paused = true
+	# Default to Ores tab on every open. Clear any stale lock first (defensive,
+	# matches Lab pattern) so set_active isn't short-circuited.
+	if _bp_tab_bar != null:
+		_bp_tab_bar.set_locked(false)
+		_bp_tab_bar.set_active(_BP_TAB_DEFAULT)
+	_bp_active_tab = _BP_TAB_DEFAULT
+	_refresh_bp()
+	# Focus the active tab button first — player uses left/right to switch,
+	# ui_down to drop into content (wired by _wire_bp_tab_bar_to_content).
+	if _bp_tab_bar != null:
+		_bp_tab_bar.focus_active()
+
+
+func _close_backpack() -> void:
+	if not _backpack_open:
+		return
+	_backpack_open = false
+	_close_inspect_popup()
+	backpack_container.visible = false
+	get_tree().paused = false
+
+
+func _on_bp_tab_changed(_index: int, id: String) -> void:
+	_bp_active_tab = id
+	_refresh_bp()
+	# Keep focus on the tab bar after a cycle so left/right keeps working.
+	if _bp_tab_bar != null:
+		_bp_tab_bar.focus_active()
+
+
+func _refresh_bp() -> void:
+	if not _backpack_open or _bp_content == null:
+		return
+	# Clear stale side-panel refs — they only exist while the Ores tab is live.
+	_bp_grid = null
+	_bp_capacity_label = null
+	_bp_gold_label = null
+	_bp_battery_label = null
+	for child in _bp_content.get_children():
+		child.queue_free()
+	match _bp_active_tab:
+		"ores": _build_ores_tab()
+		"bots": _build_bots_tab()
+		"artifacts": _build_artifacts_tab()
+		_: _build_ores_tab()
+	_wire_bp_tab_bar_to_content()
+
+
+func _wire_bp_tab_bar_to_content() -> void:
+	## ui_down on tab buttons moves into the first focusable in content; ui_up
+	## on that control returns to the active tab. Mirrors Lab's pattern.
+	if _bp_tab_bar == null or _bp_content == null:
+		return
+	var focusables: Array = FocusUtil.collect_focusables(_bp_content)
+	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
+	var first: Control = focusables[0] if not focusables.is_empty() else _bp_close_btn
+	_bp_tab_bar.wire_content_below(first)
+	var active_tab: Button = _bp_tab_bar.get_active_button()
+	if first != null and active_tab != null and not first.is_queued_for_deletion() and not active_tab.is_queued_for_deletion():
+		first.focus_neighbor_top = first.get_path_to(active_tab)
+		first.focus_previous = first.get_path_to(active_tab)
+
+
+# ── Tab: ORES (existing backpack grid + summary) ────────────────────
+
+func _build_ores_tab() -> void:
+	# Capacity summary row at the top of the Ores tab.
+	var summary := HBoxContainer.new()
+	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bp_content.add_child(summary)
+	var cap_title := Label.new()
+	cap_title.text = "Capacity:"
+	summary.add_child(cap_title)
+	_bp_capacity_label = Label.new()
+	_bp_capacity_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	summary.add_child(_bp_capacity_label)
+
+	# Body: grid + side panel (gold, merge charges).
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 12)
-	vbox.add_child(body)
+	_bp_content.add_child(body)
 
 	# Grid wrap
 	var grid_wrap := PanelContainer.new()
@@ -249,73 +360,34 @@ func _build_backpack_ui() -> void:
 	_bp_grid.add_theme_constant_override("v_separation", 4)
 	grid_wrap.add_child(_bp_grid)
 
-	# Side panel
+	# Side panel (gold + merge readout). Followers moved to Bots tab.
 	var side := VBoxContainer.new()
 	side.custom_minimum_size = Vector2(160, 0)
 	side.add_theme_constant_override("separation", 6)
 	body.add_child(side)
 
 	_bp_gold_label = Label.new()
-	_bp_gold_label.text = "Gold: 0"
 	side.add_child(_bp_gold_label)
 
 	_bp_battery_label = Label.new()
-	_bp_battery_label.text = "Merge: 0/0"
 	side.add_child(_bp_battery_label)
 
-	_bp_followers_header = Label.new()
-	_bp_followers_header.text = "FOLLOWERS"
-	side.add_child(_bp_followers_header)
-
-	_bp_followers_list = VBoxContainer.new()
-	side.add_child(_bp_followers_list)
-
-	# Close button
-	_bp_close_btn = Button.new()
-	_bp_close_btn.text = "Close"
-	_bp_close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
-	_bp_close_btn.pressed.connect(_close_backpack)
-	vbox.add_child(_bp_close_btn)
-
-
-func _open_backpack() -> void:
-	if _backpack_open:
-		return
-	_close_merge_panel()
-	_backpack_open = true
-	backpack_container.visible = true
-	get_tree().paused = true
-	_refresh_bp()
-	# Pillar A: grid navigation is deferred (Pillar B), but ensure B-button
-	# has a focus target so ui_cancel wiring does something predictable.
-	if _bp_close_btn:
-		_bp_close_btn.call_deferred("grab_focus")
-
-
-func _close_backpack() -> void:
-	if not _backpack_open:
-		return
-	_backpack_open = false
-	_close_inspect_popup()
-	backpack_container.visible = false
-	get_tree().paused = false
-
-
-func _refresh_bp() -> void:
-	if not _backpack_open:
-		return
 	_refresh_bp_header()
 	_refresh_bp_grid()
 	_refresh_bp_side()
 
 
 func _refresh_bp_header() -> void:
+	if _bp_capacity_label == null:
+		return
 	var used: int = Inventory.get_used_slots()
 	var cap: int = Inventory.get_max_capacity()
 	_bp_capacity_label.text = "%d / %d" % [used, cap]
 
 
 func _refresh_bp_grid() -> void:
+	if _bp_grid == null:
+		return  # Grid only exists while the Ores tab is built.
 	for child in _bp_grid.get_children():
 		child.queue_free()
 	var cap: int = Inventory.get_max_capacity()
@@ -552,59 +624,107 @@ func _close_inspect_popup() -> void:
 
 
 func _refresh_bp_side() -> void:
-	_bp_gold_label.text = "Gold: %d" % GameManager.gold
-	_bp_battery_label.text = "Merge: %d/%d" % [Inventory.merge_charges, Inventory.merge_charges_max]
-	for child in _bp_followers_list.get_children():
-		child.queue_free()
-	_bp_followers_header.text = "FOLLOWERS"
-	var has_any := false
-	# Show permanent bots (from run_party)
-	for entry in Inventory.run_party:
-		has_any = true
+	## Ores-tab side panel: gold + merge readout. (Followers now live on the
+	## Bots tab.)
+	if _bp_gold_label != null:
+		_bp_gold_label.text = "Gold: %d" % GameManager.gold
+	if _bp_battery_label != null:
+		_bp_battery_label.text = "Merge: %d/%d" % [Inventory.merge_charges, Inventory.merge_charges_max]
+
+
+# ── Tab: BOTS (permanent bots roster) ───────────────────────────────
+
+func _build_bots_tab() -> void:
+	## Lists Inventory.permanent_bots using the Sprint 7 row format
+	## ("Scout #1 — Lv 0 (Fire+3, Earth+1)"). Read-only: no row actions from
+	## the backpack — manage bots at the Lab.
+	var header: Label = Label.new()
+	header.text = "PERMANENT BOTS"
+	_bp_content.add_child(header)
+
+	if Inventory.permanent_bots.is_empty():
+		var empty: Label = Label.new()
+		empty.text = "No bots yet — build one at the Lab."
+		empty.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
+		_bp_content.add_child(empty)
+		return
+
+	for entry in Inventory.permanent_bots:
 		var row: HBoxContainer = HBoxContainer.new()
 		var pip: ColorRect = ColorRect.new()
 		pip.custom_minimum_size = Vector2(12, 12)
-		pip.color = Color(0.3, 0.9, 1.0)  # cyan for permanent bots
+		pip.color = Color(0.3, 0.9, 1.0)
 		row.add_child(pip)
 		var name_label: Label = Label.new()
-		var dname: String = entry.get("display_name", "Companion")
+		var dname: String = String(entry.get("display_name", "Bot"))
+		var lvl: int = int(entry.get("upgrade_level", 0))
 		var suffix: String = Inventory.format_mineral_suffix(
-			entry.get("mineral_profile", {}),
+			entry.get("mineral_profile", Inventory.empty_mineral_profile()),
 			entry.get("void_resolved", []),
 		)
-		var suffixed: String = dname if suffix.is_empty() else "%s %s" % [dname, suffix]
+		var base: String
+		if suffix == "":
+			base = "%s — Lv %d" % [dname, lvl]
+		else:
+			base = "%s — Lv %d %s" % [dname, lvl, suffix]
 		if entry.get("knocked_out", false):
-			name_label.text = "  %s (KO)" % suffixed
+			name_label.text = "  %s (KO)" % base
 			name_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.55))
 		else:
-			name_label.text = "  %s" % suffixed
+			name_label.text = "  %s" % base
 		row.add_child(name_label)
-		_bp_followers_list.add_child(row)
-	# Show disposable follower bots
-	for bot_entry in Inventory.follower_bots:
-		has_any = true
+		_bp_content.add_child(row)
+
+
+# ── Tab: ARTIFACTS ──────────────────────────────────────────────────
+
+func _build_artifacts_tab() -> void:
+	var header: Label = Label.new()
+	header.text = "ARTIFACTS"
+	_bp_content.add_child(header)
+
+	if Inventory.artifacts.is_empty():
+		var empty: Label = Label.new()
+		empty.text = "No artifacts collected."
+		empty.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
+		_bp_content.add_child(empty)
+		return
+
+	for art in Inventory.artifacts:
 		var row: HBoxContainer = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
 		var pip: ColorRect = ColorRect.new()
 		pip.custom_minimum_size = Vector2(12, 12)
-		var tier: int = int(bot_entry.get("ore_tier", 1))
-		var tier_colors: Array = [
-			Color(0.8, 0.8, 0.8),
-			Color(0.4, 0.8, 1.0),
-			Color(1.0, 0.8, 0.3),
-			Color(1.0, 0.4, 0.9),
-		]
-		pip.color = tier_colors[clampi(tier - 1, 0, 3)]
+		pip.color = Color(1.0, 0.85, 0.2)
 		row.add_child(pip)
 		var name_label: Label = Label.new()
-		var bot_data: BotData = bot_entry.get("data") as BotData
-		name_label.text = "  " + (bot_data.display_name if bot_data else "Bot")
+		var art_id: String = String(art.get("id", "?"))
+		name_label.text = "  " + art_id.replace("_", " ").capitalize()
 		row.add_child(name_label)
-		_bp_followers_list.add_child(row)
-	if not has_any:
-		var empty: Label = Label.new()
-		empty.text = "No followers"
-		empty.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
-		_bp_followers_list.add_child(empty)
+		var desc: String = _artifact_description(art_id)
+		if desc != "":
+			var desc_label: Label = Label.new()
+			desc_label.text = "— " + desc
+			desc_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			desc_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.8))
+			desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			row.add_child(desc_label)
+		_bp_content.add_child(row)
+
+
+func _artifact_description(art_id: String) -> String:
+	## Short flavor/effect line per known artifact id. Falls back to "" for
+	## unknown ids — the row still renders, just without a description.
+	match art_id:
+		"miners_lantern": return "Reveals more ore on each floor."
+		"ore_magnet": return "Auto-pickup ore within range."
+		"bot_overclock": return "Bots gain +10% attack speed."
+		"deep_pockets": return "+4 backpack slots."
+		"thick_boots": return "Reduces contact damage."
+		"lucky_strike": return "Ore mining sometimes drops extra pieces."
+		"scrap_recycler": return "Returns partial ore when bots are destroyed."
+		"emergency_battery": return "Extra merge charge on run start."
+		_: return ""
 
 
 # ── Build menu removed in Sprint 5 (bots are built at the Lab in town) ──

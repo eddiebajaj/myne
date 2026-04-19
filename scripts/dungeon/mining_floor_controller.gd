@@ -61,17 +61,16 @@ func _respawn_permanent_bots() -> void:
 
 func _spawn_permanent_bot(entry: Dictionary, pos: Vector2) -> void:
 	## Build a permanent bot scene programmatically and add it to the floor.
-	## Applies Lab upgrade levels (hp_upgrade_level / damage_upgrade_level) to
-	## the base stats for the bot type, then layers Sprint 7 mineral bonuses
-	## (mineral_profile + void_resolved) on top.
+	## Applies Sprint 8 unified upgrade_level scaling (HP/damage/attack_speed)
+	## on top of the base stats, then layers Sprint 7 mineral bonuses
+	## (mineral_profile + void_resolved) on top of that.
 	var bot_id: String = entry.get("id", "")
-	# Ensure legacy save entries have the Sprint 7 fields (mineral_profile,
-	# void_resolved, instance_number, display_name with "#N") before we read.
+	# Ensure legacy save entries have the Sprint 7/8 fields (mineral_profile,
+	# void_resolved, instance_number, upgrade_level, display_name with "#N").
 	var type_dname: String = BOT_TYPE_DISPLAY_NAMES.get(bot_id, String(bot_id).capitalize())
 	Inventory.ensure_bot_migration(entry, type_dname)
 	var dname: String = entry.get("display_name", "Companion")
-	var hp_up: int = int(entry.get("hp_upgrade_level", 0))
-	var dmg_up: int = int(entry.get("damage_upgrade_level", 0))
+	var upgrade_level: int = int(entry.get("upgrade_level", 0))
 
 	# Per-bot base stats (Sprint 5 Round 2 spec §1)
 	var atk_range: float = 130.0
@@ -112,9 +111,20 @@ func _spawn_permanent_bot(entry: Dictionary, pos: Vector2) -> void:
 			bot_color = Color(0.3, 0.9, 1.0)  # cyan
 			script_path = "res://scripts/bots/permanent_bot.gd"
 
-	# Upgrade bonuses apply on top of base stats stored in the entry
-	var base_max_hp: float = float(entry.get("max_health", 40.0)) + hp_up * 10.0
-	var base_damage: float = float(entry.get("damage", 0.0)) + dmg_up * 1.0
+	# Sprint 8: unified upgrade_level scaling applied BEFORE mineral bonuses.
+	# Formulas per spec §A3:
+	#   max_health += base_max_health * 0.20 * upgrade_level  (additive %)
+	#   damage     += base_damage     * 0.15 * upgrade_level  (additive %)
+	#   attack_speed *= pow(1.05, upgrade_level)              (multiplicative)
+	# IMPORTANT: read from immutable base_* fields, NOT from entry["max_health"] /
+	# entry["damage"] — those are mutated below (lines 154-155) as HUD/merge
+	# mirrors, and reading them here would compound scaling every floor entry.
+	# Fallback chain handles legacy entries that haven't been migrated yet.
+	var base_max_hp_raw: float = float(entry.get("base_max_health", entry.get("max_health", 40.0)))
+	var base_damage_raw: float = float(entry.get("base_damage", entry.get("damage", 0.0)))
+	var base_max_hp: float = base_max_hp_raw + base_max_hp_raw * 0.20 * float(upgrade_level)
+	var base_damage: float = base_damage_raw + base_damage_raw * 0.15 * float(upgrade_level)
+	atk_speed *= pow(1.05, float(upgrade_level))
 
 	# Sprint 7: apply mineral_profile + void_resolved bonuses on top of
 	# (base + upgrade) stats. Counts are per-mineral piece.

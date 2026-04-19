@@ -483,17 +483,27 @@ func _on_sell_ore() -> void:
 
 
 # ── Storage Shed ────────────────────────────────────────────────────
+#
+# Sprint 8 §B3: tabbed Deposit / Withdraw layout.
+# - Deposit tab: rows are backpack ore stacks; press A to deposit 1 piece.
+#   A "Deposit All" button lives at the bottom of this tab.
+# - Withdraw tab: rows are storage ore stacks; press A to withdraw 1 piece.
+# Tab swap is driven by TabBarUI.tab_changed; the content VBox is cleared and
+# rebuilt per tab. Focus-index preservation mirrors the Sprint 7 pattern in
+# npc_lab.gd — on deposit/withdraw press we save the focused button's index
+# within the current tab's focusable list and restore it after the rebuild so
+# continuous clicks keep focus on the same row (or nearest if the row is gone).
 
 var storage_shed_area: Area2D = null
 var storage_panel_layer: CanvasLayer = null
 var storage_panel_dim: ColorRect = null
 var storage_panel: PanelContainer = null
-var storage_backpack_list: VBoxContainer = null
-var storage_storage_list: VBoxContainer = null
-var storage_storage_header: Label = null
+var storage_tab_bar: TabBarUI = null
+var storage_header_label: Label = null         # "Backpack: N/M" or "Storage: N/48"
+var storage_content_list: VBoxContainer = null # rebuilt per tab (rows + optional Deposit All)
 var storage_result_label: Label = null
-var storage_deposit_btn: Button = null
 var storage_close_btn: Button = null
+var _storage_active_tab: String = "deposit"
 
 
 func _build_storage_shed() -> void:
@@ -558,7 +568,7 @@ func _build_storage_panel() -> void:
 	storage_panel.anchor_top = 0.5
 	storage_panel.anchor_right = 0.5
 	storage_panel.anchor_bottom = 0.5
-	storage_panel.custom_minimum_size = Vector2(640, 0)
+	storage_panel.custom_minimum_size = Vector2(520, 0)
 	storage_panel_layer.add_child(storage_panel)
 
 	var vbox := VBoxContainer.new()
@@ -572,41 +582,28 @@ func _build_storage_panel() -> void:
 	vbox.add_child(title)
 	vbox.add_child(HSeparator.new())
 
-	# Two-column split
-	var cols := HBoxContainer.new()
-	cols.add_theme_constant_override("separation", 16)
-	vbox.add_child(cols)
+	# Tab bar (Sprint 8 shared component).
+	storage_tab_bar = TabBarUI.new()
+	storage_tab_bar.name = "StorageTabBar"
+	storage_tab_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	storage_tab_bar.add_tab("deposit", "Deposit")
+	storage_tab_bar.add_tab("withdraw", "Withdraw")
+	storage_tab_bar.tab_changed.connect(_on_storage_tab_changed)
+	vbox.add_child(storage_tab_bar)
 
-	var left := VBoxContainer.new()
-	left.add_theme_constant_override("separation", 4)
-	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cols.add_child(left)
-	var lh := Label.new()
-	lh.text = "Backpack"
-	lh.add_theme_font_size_override("font_size", 18)
-	left.add_child(lh)
-	storage_backpack_list = VBoxContainer.new()
-	storage_backpack_list.add_theme_constant_override("separation", 2)
-	left.add_child(storage_backpack_list)
+	# Header ("Backpack: N/M" or "Storage: N/48"). Rebuilt per refresh.
+	storage_header_label = Label.new()
+	storage_header_label.text = ""
+	storage_header_label.add_theme_font_size_override("font_size", 18)
+	vbox.add_child(storage_header_label)
 
-	var right := VBoxContainer.new()
-	right.add_theme_constant_override("separation", 4)
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cols.add_child(right)
-	storage_storage_header = Label.new()
-	storage_storage_header.text = "Storage (0/48)"
-	storage_storage_header.add_theme_font_size_override("font_size", 18)
-	right.add_child(storage_storage_header)
-	storage_storage_list = VBoxContainer.new()
-	storage_storage_list.add_theme_constant_override("separation", 2)
-	right.add_child(storage_storage_list)
+	# Content VBox — cleared and rebuilt on tab change / deposit / withdraw.
+	storage_content_list = VBoxContainer.new()
+	storage_content_list.add_theme_constant_override("separation", 2)
+	storage_content_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(storage_content_list)
 
 	vbox.add_child(HSeparator.new())
-
-	storage_deposit_btn = Button.new()
-	storage_deposit_btn.text = "Deposit All"
-	storage_deposit_btn.pressed.connect(_on_storage_deposit_all)
-	vbox.add_child(storage_deposit_btn)
 
 	storage_result_label = Label.new()
 	storage_result_label.text = ""
@@ -620,10 +617,10 @@ func _build_storage_panel() -> void:
 
 	storage_panel.visible = false
 	storage_panel_dim.visible = false
-	storage_panel.offset_left = -320
-	storage_panel.offset_top = -240
-	storage_panel.offset_right = 320
-	storage_panel.offset_bottom = 240
+	storage_panel.offset_left = -260
+	storage_panel.offset_top = -260
+	storage_panel.offset_right = 260
+	storage_panel.offset_bottom = 260
 
 
 func _open_storage_panel() -> void:
@@ -633,11 +630,14 @@ func _open_storage_panel() -> void:
 	storage_panel.visible = true
 	storage_panel_dim.visible = true
 	get_tree().paused = true
+	# Default tab = Deposit. If the bar was already on "deposit" from a prior
+	# session, set_active is a no-op and won't fire tab_changed — call
+	# _refresh_storage_panel defensively either way.
+	_storage_active_tab = "deposit"
+	storage_tab_bar.set_active("deposit")
 	_refresh_storage_panel()
-	if storage_deposit_btn and not storage_deposit_btn.disabled:
-		storage_deposit_btn.call_deferred("grab_focus")
-	elif storage_close_btn:
-		storage_close_btn.call_deferred("grab_focus")
+	# Focus the active tab so L/R cycling works immediately.
+	storage_tab_bar.focus_active()
 
 
 func _close_storage_panel() -> void:
@@ -650,74 +650,148 @@ func _close_storage_panel() -> void:
 	get_tree().paused = false
 
 
-func _refresh_storage_panel() -> void:
-	# Backpack column
-	for c in storage_backpack_list.get_children():
+func _on_storage_tab_changed(_index: int, id: String) -> void:
+	_storage_active_tab = id
+	_refresh_storage_panel()
+	# Keep focus on the tab bar after a cycle so L/R keeps working.
+	storage_tab_bar.focus_active()
+
+
+func _refresh_storage_panel(restore_focus_index: int = -1) -> void:
+	## Rebuild header + rows for the active tab. When restore_focus_index >= 0,
+	## re-focus the row at that index (clamped) after rebuild — matches the
+	## Sprint 7 focus-preservation pattern so continuous deposit/withdraw clicks
+	## stay on the same row (or nearest if the row vanished).
+	for c in storage_content_list.get_children():
 		c.queue_free()
+
+	if _storage_active_tab == "deposit":
+		_build_deposit_tab()
+	else:
+		_build_withdraw_tab()
+
+	_wire_storage_focus_wrap()
+	# Re-point the tab bar's ui_down neighbor at the first content control.
+	var content_focusables: Array = _collect_storage_focusables()
+	var first: Control = null
+	if not content_focusables.is_empty():
+		first = content_focusables[0]
+	if storage_tab_bar:
+		storage_tab_bar.wire_content_below(first if first != null else storage_close_btn)
+		# ui_up from the first row returns to the active tab.
+		var active_tab_btn: Button = storage_tab_bar.get_active_button()
+		if first != null and active_tab_btn != null and not first.is_queued_for_deletion() and not active_tab_btn.is_queued_for_deletion():
+			first.focus_neighbor_top = first.get_path_to(active_tab_btn)
+			first.focus_previous = first.get_path_to(active_tab_btn)
+
+	if restore_focus_index >= 0:
+		_focus_storage_button_at_index(restore_focus_index)
+
+
+func _build_deposit_tab() -> void:
+	## Deposit tab: backpack ores as "A to deposit 1" rows + "Deposit All".
+	var used: int = Inventory.get_used_slots()
+	var cap: int = Inventory.get_max_capacity()
+	storage_header_label.text = "Backpack: %d/%d" % [used, cap]
+
 	var bp_stacks: Array[Dictionary] = Inventory.get_ore_stacks()
 	if bp_stacks.is_empty():
 		var e := Label.new()
-		e.text = "(empty)"
-		storage_backpack_list.add_child(e)
+		e.text = "Backpack is empty."
+		e.add_theme_color_override("font_color", Color(0.75, 0.75, 0.80))
+		storage_content_list.add_child(e)
 	else:
+		var storage_full: bool = Inventory.get_storage_remaining() <= 0
 		for slot in bp_stacks:
-			var lbl := Label.new()
-			var stack_name: String = _storage_stack_name(slot)
-			lbl.text = "%s x%d" % [stack_name, int(slot.quantity)]
-			storage_backpack_list.add_child(lbl)
-
-	# Storage column
-	for c in storage_storage_list.get_children():
-		c.queue_free()
-	storage_storage_header.text = "Storage (%d/%d)" % [Inventory.get_storage_used(), Inventory.STORAGE_CAPACITY]
-	var st_stacks: Array[Dictionary] = Inventory.get_storage_stacks()
-	if st_stacks.is_empty():
-		var e2 := Label.new()
-		e2.text = "(empty)"
-		storage_storage_list.add_child(e2)
-	else:
-		for slot in st_stacks:
-			var row := HBoxContainer.new()
-			row.add_theme_constant_override("separation", 8)
-			var lbl := Label.new()
-			var stack_name: String = _storage_stack_name(slot)
-			lbl.text = "%s x%d" % [stack_name, int(slot.quantity)]
-			lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			row.add_child(lbl)
 			var btn := Button.new()
-			btn.text = "Withdraw 1"
-			btn.disabled = Inventory.get_remaining_slots() <= 0
+			var stack_name: String = _storage_stack_name(slot)
+			btn.text = "%s x%d" % [stack_name, int(slot.quantity)]
+			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			btn.disabled = storage_full
 			var ore_id: String = slot.ore.id
 			var mineral_id: String = slot.mineral.id if slot.mineral else ""
-			btn.pressed.connect(func(): _on_storage_withdraw_one(ore_id, mineral_id))
-			row.add_child(btn)
-			storage_storage_list.add_child(row)
-	_wire_storage_focus_wrap()
+			btn.pressed.connect(func(): _on_storage_deposit_one(ore_id, mineral_id))
+			storage_content_list.add_child(btn)
+
+		# Separator + Deposit All at the bottom of the tab.
+		storage_content_list.add_child(HSeparator.new())
+		var all_btn := Button.new()
+		all_btn.text = "Deposit All"
+		all_btn.disabled = storage_full
+		all_btn.pressed.connect(_on_storage_deposit_all)
+		storage_content_list.add_child(all_btn)
+
+
+func _build_withdraw_tab() -> void:
+	## Withdraw tab: storage ores as "A to withdraw 1" rows.
+	storage_header_label.text = "Storage: %d/%d" % [Inventory.get_storage_used(), Inventory.STORAGE_CAPACITY]
+
+	var st_stacks: Array[Dictionary] = Inventory.get_storage_stacks()
+	if st_stacks.is_empty():
+		var e := Label.new()
+		e.text = "Storage is empty."
+		e.add_theme_color_override("font_color", Color(0.75, 0.75, 0.80))
+		storage_content_list.add_child(e)
+		return
+
+	var backpack_full: bool = Inventory.get_remaining_slots() <= 0
+	for slot in st_stacks:
+		var btn := Button.new()
+		var stack_name: String = _storage_stack_name(slot)
+		btn.text = "%s x%d" % [stack_name, int(slot.quantity)]
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.disabled = backpack_full
+		var ore_id: String = slot.ore.id
+		var mineral_id: String = slot.mineral.id if slot.mineral else ""
+		btn.pressed.connect(func(): _on_storage_withdraw_one(ore_id, mineral_id))
+		storage_content_list.add_child(btn)
 
 
 func _wire_storage_focus_wrap() -> void:
-	var focusables: Array = FocusUtil.collect_focusables(storage_storage_list)
-	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
-	if storage_deposit_btn:
-		focusables.append(storage_deposit_btn)
+	var focusables: Array = _collect_storage_focusables()
 	if storage_close_btn:
 		focusables.append(storage_close_btn)
 	FocusUtil.wire_vertical_wrap(focusables)
 
 
-func _focus_first_storage_button() -> void:
-	## Re-grab focus after storage panel rebuild (deposit/withdraw).
-	var focusables: Array = FocusUtil.collect_focusables(storage_storage_list)
-	for ctrl in focusables:
-		if ctrl.is_queued_for_deletion():
-			continue
-		if ctrl is Button and not ctrl.disabled:
-			ctrl.call_deferred("grab_focus")
-			return
-	if storage_deposit_btn and not storage_deposit_btn.disabled:
-		storage_deposit_btn.call_deferred("grab_focus")
-	elif storage_close_btn:
-		storage_close_btn.call_deferred("grab_focus")
+func _collect_storage_focusables() -> Array:
+	## All focusable buttons inside the tab's content area (excludes tab bar
+	## and close button — those are wired separately).
+	var focusables: Array = FocusUtil.collect_focusables(storage_content_list)
+	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
+	return focusables
+
+
+func _get_focused_storage_button_index() -> int:
+	## Find the currently focused control's index within the content list
+	## (ignoring the tab bar and close button). Returns -1 if focus is not in
+	## content, so the caller can choose a fallback (e.g. close button).
+	var focused := storage_content_list.get_viewport().gui_get_focus_owner()
+	if focused == null:
+		return -1
+	var focusables: Array = _collect_storage_focusables()
+	return focusables.find(focused)
+
+
+func _focus_storage_button_at_index(idx: int) -> void:
+	var focusables: Array = _collect_storage_focusables()
+	if focusables.is_empty():
+		# No rows left (backpack emptied after deposit-all, etc.) — bounce to
+		# the active tab so L/R still feels responsive.
+		if storage_tab_bar:
+			storage_tab_bar.focus_active()
+		elif storage_close_btn:
+			storage_close_btn.call_deferred("grab_focus")
+		return
+	idx = clampi(idx, 0, focusables.size() - 1)
+	var ctrl: Control = focusables[idx]
+	if ctrl is Button and ctrl.disabled:
+		# Prefer a non-disabled button if one exists nearby.
+		for alt in focusables:
+			if alt is Button and not alt.disabled:
+				alt.call_deferred("grab_focus")
+				return
+	ctrl.call_deferred("grab_focus")
 
 
 func _storage_stack_name(slot: Dictionary) -> String:
@@ -727,20 +801,32 @@ func _storage_stack_name(slot: Dictionary) -> String:
 	return base
 
 
+func _on_storage_deposit_one(ore_id: String, mineral_id: String) -> void:
+	var focus_idx: int = _get_focused_storage_button_index()
+	if Inventory.deposit_one_to_storage(ore_id, mineral_id):
+		storage_result_label.text = "Deposited 1."
+	else:
+		storage_result_label.text = "Storage full or item missing."
+	_refresh_storage_panel(focus_idx)
+
+
 func _on_storage_deposit_all() -> void:
 	var moved: int = Inventory.deposit_all_to_storage()
 	if moved > 0:
 		storage_result_label.text = "Deposited %d pieces." % moved
 	else:
 		storage_result_label.text = "Nothing to deposit (or storage full)."
+	# After Deposit All the backpack is (usually) empty, so there are no rows
+	# to restore to — let the tab bar or close button take focus.
 	_refresh_storage_panel()
-	_focus_first_storage_button()
+	if storage_tab_bar:
+		storage_tab_bar.focus_active()
 
 
 func _on_storage_withdraw_one(ore_id: String, mineral_id: String) -> void:
+	var focus_idx: int = _get_focused_storage_button_index()
 	if Inventory.withdraw_one_from_storage(ore_id, mineral_id):
 		storage_result_label.text = "Withdrew 1."
 	else:
 		storage_result_label.text = "Backpack full or item missing."
-	_refresh_storage_panel()
-	_focus_first_storage_button()
+	_refresh_storage_panel(focus_idx)
