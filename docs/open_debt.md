@@ -25,13 +25,29 @@ Carried forward each sprint. Items are added when deferred, removed when resolve
 | D19 | Tetris-like backpack shapes | Sprint 5 | Medium | Eddie mentioned as upcoming |
 | D20 | Storage tabs / upgrade path | Sprint 5 | Low | Once base 48 slots fill up |
 | D21 | Rare bot blueprints (Guardian, Healer, Amplifier) | Sprint 5 | Medium | Need progression gates |
-| D22 | Bot upgrades using new crafting mechanic | Sprint 6 | High | Sprint 8 — old upgrade view disabled ("Coming Soon") in Sprint 7 |
 | D23 | Backpack grid navigation | Sprint 6 | Low | Deferred until tetris-like rework |
 | D24 | Bot rename UI | Sprint 7 | Low | Auto-numbering for now ("Scout #1") |
 | D25 | Sound effects (negative SFX, hit feedback) | Sprint 6 | Low | Future polish |
 | D26 | Hard material recipe balance | Sprint 7 | Medium | Values feel right at B1-B3, untested at depth or with multiple builds/run |
 | D27 | Void mineral never drops | Sprint 7 | Low | Not in `MineralData.get_all_minerals()`. Build-time data flow ready; activates when drops wired |
 | D28 | Ice/Thunder/Venom on-hit mechanics | Sprint 7 | Medium | Counts stored as bot meta; no runtime hit code consumes them yet |
+| D29 | Market tab conversion | Sprint 8 | Low | Deferred — no Buy flow exists yet. Revisit when Trader NPC or Buy content designed |
+| D30 | Legacy upgraded-bot stat drift | Sprint 8 | Low | Migration collapses `hp_upgrade_level`/`damage_upgrade_level` into `upgrade_level` via max-of-the-two. Stats may shift slightly for bots upgraded in Sprint 5-6 |
+
+## Resolved (Sprint 8)
+
+| ID | Debt | Resolved In | How |
+|---|---|---|---|
+| D22 | Bot upgrades via crafting mechanic (C3) | Sprint 8 | Upgrade tab with recipe grid, escalating thresholds, 1x hard materials |
+| — | Lab UI finalization (tabbed layout) | Sprint 8 | 5-tab horizontal TabBar with shoulder-button nav |
+| — | Scrap owned bots | Sprint 8 | Scrap tab with 50% point refund, greedy hard-material packing |
+| — | Backpack panel UX pass | Sprint 8 | Ores/Bots/Artifacts tabs |
+| — | Town Storage UX pass | Sprint 8 | Deposit/Withdraw tabs, per-row focus preservation |
+| — | Version visibility | Sprint 8 | `v0.8.0a` label bottom-right via `GameVersion` autoload |
+| — | CI auto-build on push | Sprint 8 | Restored `push: main` trigger alongside `workflow_dispatch` |
+| — | Stat compounding bug | Sprint 8 | Added immutable `base_max_health`/`base_damage` fields |
+| — | Focus loss on add/remove (post-Sprint-8 regression) | Sprint 8 | `await get_tree().process_frame` before `grab_focus` — fixes `queue_free` tree-exit race |
+| — | Tab nav via joystick accidents | Sprint 8 | Moved to dedicated `tab_prev`/`tab_next` (Q/E + LB/RB) |
 
 ## Resolved (Sprint 7)
 

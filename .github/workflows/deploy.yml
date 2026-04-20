@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  GODOT_VERSION: "4.2.2"
+  GODOT_VERSION: "4.6.2"
   ITCH_USER: "bajaj"
   ITCH_GAME: "myne"
 
@@ -17,7 +17,7 @@ jobs:
     name: Export Web Build
     runs-on: ubuntu-latest
     container:
-      image: barichello/godot-ci:4.2.2
+      image: barichello/godot-ci:4.6.2
     steps:
       - name: Checkout
         uses: actions/checkout@v4

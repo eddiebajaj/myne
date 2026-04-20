@@ -8,7 +8,7 @@ extends Node
 ## autoload .tscn UI panels can fail to initialise — we build the CanvasLayer
 ## and Label at runtime in _ready() instead.
 
-const VERSION := "v0.8.0a"
+const VERSION := "v0.9.0a"
 
 var _canvas_layer: CanvasLayer
 var _label: Label

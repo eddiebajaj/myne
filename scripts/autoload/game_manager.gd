@@ -78,6 +78,8 @@ func start_run(from_checkpoint: int = 0) -> void:
 		merge_just_unlocked = true
 	Inventory.begin_run()
 	_reset_run_vitals()
+	# Sprint 9: rotate the procgen run seed so each run rolls a fresh set of caves.
+	FloorGenerator.reset_run_seed()
 	get_tree().change_scene_to_file("res://scenes/dungeon/mining_floor.tscn")
 	current_state = GameState.MINING
 	state_changed.emit(current_state)

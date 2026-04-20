@@ -1,12 +1,22 @@
 ; Engine configuration file.
 ; It's best edited using the editor UI and not directly,
-; but it can also be edited via code.
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
 config/name="Mining Game"
 run/main_scene="res://scenes/town/town.tscn"
-config/features=PackedStringArray("4.2", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 
 [autoload]
 
@@ -21,22 +31,6 @@ BackpackPanel="*res://scenes/ui/backpack_panel.tscn"
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
-
-[layer_names]
-
-2d_physics/layer_1="player"
-2d_physics/layer_2="ore_nodes"
-2d_physics/layer_3="enemies"
-2d_physics/layer_4="bots"
-2d_physics/layer_5="walls"
-2d_physics/layer_6="stairs"
-2d_physics/layer_7="interactables"
-
-[input_devices]
-
-pointing/emulate_touch_from_mouse=true
-pointing/emulate_mouse_from_touch=true
 
 [input]
 
@@ -119,3 +113,17 @@ tab_next={
 , Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":5,"pressure":0.0,"pressed":false,"script":null)
 ]
 }
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+
+[layer_names]
+
+2d_physics/layer_1="player"
+2d_physics/layer_2="ore_nodes"
+2d_physics/layer_3="enemies"
+2d_physics/layer_4="bots"
+2d_physics/layer_5="walls"
+2d_physics/layer_6="stairs"
+2d_physics/layer_7="interactables"

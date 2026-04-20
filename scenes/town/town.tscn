@@ -1,10 +1,16 @@
-[gd_scene load_steps=7 format=3 uid="uid://town_scene"]
+[gd_scene format=3 uid="uid://f4faurhhqbya"]
 
-[ext_resource type="Script" path="res://scripts/town/town.gd" id="1"]
-[ext_resource type="PackedScene" uid="uid://player_scene" path="res://scenes/player/player.tscn" id="2"]
-[ext_resource type="Script" path="res://scripts/town/npc_market.gd" id="3"]
-[ext_resource type="Script" path="res://scripts/town/npc_smith.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/town/npc_lab.gd" id="5"]
+[ext_resource type="Script" uid="uid://bu8i0c6kfkb1k" path="res://scripts/town/town.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="2"]
+[ext_resource type="Script" uid="uid://b2m1sfakt4sat" path="res://scripts/town/npc_market.gd" id="3"]
+[ext_resource type="Script" uid="uid://da2uotjaj3hwt" path="res://scripts/town/npc_smith.gd" id="4"]
+[ext_resource type="Script" uid="uid://0b8tqntjyvv7" path="res://scripts/town/npc_lab.gd" id="5"]
+
+[sub_resource type="RectangleShape2D" id="5"]
+size = Vector2(1280, 32)
+
+[sub_resource type="RectangleShape2D" id="6"]
+size = Vector2(32, 720)
 
 [sub_resource type="RectangleShape2D" id="1"]
 size = Vector2(80, 80)
@@ -18,389 +24,388 @@ size = Vector2(80, 80)
 [sub_resource type="RectangleShape2D" id="4"]
 size = Vector2(120, 80)
 
-[sub_resource type="RectangleShape2D" id="5"]
-size = Vector2(1280, 32)
-
-[sub_resource type="RectangleShape2D" id="6"]
-size = Vector2(32, 720)
-
-[node name="Town" type="Node2D"]
+[node name="Town" type="Node2D" unique_id=621023315]
 script = ExtResource("1")
 
-[node name="Background" type="ColorRect" parent="."]
-offset_right = 1280
-offset_bottom = 720
+[node name="Background" type="ColorRect" parent="." unique_id=1948024473]
+offset_right = 1280.0
+offset_bottom = 720.0
 color = Color(0.12, 0.1, 0.08, 1)
 
-[node name="Ground" type="ColorRect" parent="."]
-offset_left = 32
-offset_top = 32
-offset_right = 1248
-offset_bottom = 688
+[node name="Ground" type="ColorRect" parent="." unique_id=1587446291]
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 1248.0
+offset_bottom = 688.0
 color = Color(0.3, 0.25, 0.18, 1)
 
-[node name="Walls" type="StaticBody2D" parent="."]
+[node name="Walls" type="StaticBody2D" parent="." unique_id=921094637]
 collision_layer = 16
 
-[node name="Top" type="CollisionShape2D" parent="Walls"]
+[node name="Top" type="CollisionShape2D" parent="Walls" unique_id=212000778]
 position = Vector2(640, 16)
 shape = SubResource("5")
 
-[node name="Bottom" type="CollisionShape2D" parent="Walls"]
+[node name="Bottom" type="CollisionShape2D" parent="Walls" unique_id=11588784]
 position = Vector2(640, 704)
 shape = SubResource("5")
 
-[node name="Left" type="CollisionShape2D" parent="Walls"]
+[node name="Left" type="CollisionShape2D" parent="Walls" unique_id=127022749]
 position = Vector2(16, 360)
 shape = SubResource("6")
 
-[node name="Right" type="CollisionShape2D" parent="Walls"]
+[node name="Right" type="CollisionShape2D" parent="Walls" unique_id=116246696]
 position = Vector2(1264, 360)
 shape = SubResource("6")
 
-[node name="TopWall" type="ColorRect" parent="Walls"]
-offset_right = 1280
-offset_bottom = 32
+[node name="TopWall" type="ColorRect" parent="Walls" unique_id=1232158258]
+offset_right = 1280.0
+offset_bottom = 32.0
 color = Color(0.4, 0.32, 0.25, 1)
 
-[node name="BottomWall" type="ColorRect" parent="Walls"]
-offset_top = 688
-offset_right = 1280
-offset_bottom = 720
+[node name="BottomWall" type="ColorRect" parent="Walls" unique_id=341179645]
+offset_top = 688.0
+offset_right = 1280.0
+offset_bottom = 720.0
 color = Color(0.4, 0.32, 0.25, 1)
 
-[node name="LeftWall" type="ColorRect" parent="Walls"]
-offset_top = 32
-offset_right = 32
-offset_bottom = 688
+[node name="LeftWall" type="ColorRect" parent="Walls" unique_id=1091575413]
+offset_top = 32.0
+offset_right = 32.0
+offset_bottom = 688.0
 color = Color(0.4, 0.32, 0.25, 1)
 
-[node name="RightWall" type="ColorRect" parent="Walls"]
-offset_left = 1248
-offset_top = 32
-offset_right = 1280
-offset_bottom = 688
+[node name="RightWall" type="ColorRect" parent="Walls" unique_id=1512164699]
+offset_left = 1248.0
+offset_top = 32.0
+offset_right = 1280.0
+offset_bottom = 688.0
 color = Color(0.4, 0.32, 0.25, 1)
 
-[node name="Player" parent="." instance=ExtResource("2")]
+[node name="Player" parent="." unique_id=1117908346 instance=ExtResource("2")]
 position = Vector2(640, 500)
 
-[node name="Camera2D" type="Camera2D" parent="Player"]
+[node name="Camera2D" type="Camera2D" parent="Player" unique_id=954575577]
 limit_left = 0
 limit_top = 0
 limit_right = 1280
 limit_bottom = 720
 
-[node name="MarketNPC" type="Area2D" parent="."]
+[node name="MarketNPC" type="Area2D" parent="." unique_id=1778658400]
 position = Vector2(300, 200)
 collision_layer = 64
-collision_mask = 1
 script = ExtResource("3")
 
-[node name="Sprite" type="ColorRect" parent="MarketNPC"]
-offset_left = -28
-offset_top = -28
-offset_right = 28
-offset_bottom = 28
+[node name="Sprite" type="ColorRect" parent="MarketNPC" unique_id=1608687844]
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
 color = Color(0.2, 0.75, 0.3, 1)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="MarketNPC"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MarketNPC" unique_id=508137005]
 shape = SubResource("1")
 
-[node name="Label" type="Label" parent="MarketNPC"]
-offset_left = -50
-offset_top = 32
-offset_right = 50
-offset_bottom = 52
+[node name="Label" type="Label" parent="MarketNPC" unique_id=1812001737]
+visible = false
+offset_left = -50.0
+offset_top = 32.0
+offset_right = 50.0
+offset_bottom = 52.0
 text = "Market [E]"
 horizontal_alignment = 1
-visible = false
 
-[node name="NPCLabel" type="Label" parent="MarketNPC"]
-offset_left = -40
-offset_top = -48
-offset_right = 40
-offset_bottom = -28
+[node name="NPCLabel" type="Label" parent="MarketNPC" unique_id=316098015]
+offset_left = -40.0
+offset_top = -48.0
+offset_right = 40.0
+offset_bottom = -28.0
 text = "MARKET"
 horizontal_alignment = 1
 
-[node name="CanvasLayer" type="CanvasLayer" parent="MarketNPC"]
+[node name="CanvasLayer" type="CanvasLayer" parent="MarketNPC" unique_id=882411249]
 
-[node name="MenuPanel" type="PanelContainer" parent="MarketNPC/CanvasLayer"]
-offset_left = 20
-offset_top = 100
-offset_right = 400
-offset_bottom = 400
+[node name="MenuPanel" type="PanelContainer" parent="MarketNPC/CanvasLayer" unique_id=250556081]
 visible = false
+offset_left = 20.0
+offset_top = 100.0
+offset_right = 400.0
+offset_bottom = 400.0
 
-[node name="VBox" type="VBoxContainer" parent="MarketNPC/CanvasLayer/MenuPanel"]
+[node name="VBox" type="VBoxContainer" parent="MarketNPC/CanvasLayer/MenuPanel" unique_id=86618604]
 layout_mode = 2
 
-[node name="Title" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="Title" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox" unique_id=1984471796]
 layout_mode = 2
 text = "— MARKET —"
 horizontal_alignment = 1
 
-[node name="GoldLabel" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="GoldLabel" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox" unique_id=166495306]
 layout_mode = 2
 text = "Gold: 0"
 
-[node name="InventoryLabel" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="InventoryLabel" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox" unique_id=1745359994]
 layout_mode = 2
 text = "Backpack: empty"
 
-[node name="BatteryLabel" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="BatteryLabel" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox" unique_id=946551024]
 layout_mode = 2
 text = "Batteries: 0"
 
-[node name="SellButton" type="Button" parent="MarketNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="SellButton" type="Button" parent="MarketNPC/CanvasLayer/MenuPanel/VBox" unique_id=1927154426]
 layout_mode = 2
 text = "Sell All Ore"
 
-[node name="BuyBatteryButton" type="Button" parent="MarketNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="BuyBatteryButton" type="Button" parent="MarketNPC/CanvasLayer/MenuPanel/VBox" unique_id=1028145570]
 layout_mode = 2
 text = "Buy Battery (8 gold)"
 
-[node name="ResultLabel" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="ResultLabel" type="Label" parent="MarketNPC/CanvasLayer/MenuPanel/VBox" unique_id=300662250]
 layout_mode = 2
 horizontal_alignment = 1
 
-[node name="CloseButton" type="Button" parent="MarketNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="CloseButton" type="Button" parent="MarketNPC/CanvasLayer/MenuPanel/VBox" unique_id=239616998]
 layout_mode = 2
 text = "Close"
 
-[node name="SmithNPC" type="Area2D" parent="."]
+[node name="SmithNPC" type="Area2D" parent="." unique_id=2099772034]
 position = Vector2(640, 200)
 collision_layer = 64
-collision_mask = 1
 script = ExtResource("4")
 
-[node name="Sprite" type="ColorRect" parent="SmithNPC"]
-offset_left = -28
-offset_top = -28
-offset_right = 28
-offset_bottom = 28
+[node name="Sprite" type="ColorRect" parent="SmithNPC" unique_id=69930961]
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
 color = Color(0.85, 0.55, 0.2, 1)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="SmithNPC"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="SmithNPC" unique_id=459159821]
 shape = SubResource("2")
 
-[node name="Label" type="Label" parent="SmithNPC"]
-offset_left = -50
-offset_top = 32
-offset_right = 50
-offset_bottom = 52
+[node name="Label" type="Label" parent="SmithNPC" unique_id=529485705]
+visible = false
+offset_left = -50.0
+offset_top = 32.0
+offset_right = 50.0
+offset_bottom = 52.0
 text = "Smith [E]"
 horizontal_alignment = 1
-visible = false
 
-[node name="NPCLabel" type="Label" parent="SmithNPC"]
-offset_left = -40
-offset_top = -48
-offset_right = 40
-offset_bottom = -28
+[node name="NPCLabel" type="Label" parent="SmithNPC" unique_id=261444314]
+offset_left = -40.0
+offset_top = -48.0
+offset_right = 40.0
+offset_bottom = -28.0
 text = "SMITH"
 horizontal_alignment = 1
 
-[node name="CanvasLayer" type="CanvasLayer" parent="SmithNPC"]
+[node name="CanvasLayer" type="CanvasLayer" parent="SmithNPC" unique_id=200696652]
 
-[node name="MenuPanel" type="PanelContainer" parent="SmithNPC/CanvasLayer"]
-offset_left = 20
-offset_top = 100
-offset_right = 450
-offset_bottom = 420
+[node name="MenuPanel" type="PanelContainer" parent="SmithNPC/CanvasLayer" unique_id=1278905349]
 visible = false
+offset_left = 20.0
+offset_top = 100.0
+offset_right = 450.0
+offset_bottom = 420.0
 
-[node name="VBox" type="VBoxContainer" parent="SmithNPC/CanvasLayer/MenuPanel"]
+[node name="VBox" type="VBoxContainer" parent="SmithNPC/CanvasLayer/MenuPanel" unique_id=1147888765]
 layout_mode = 2
 
-[node name="Title" type="Label" parent="SmithNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="Title" type="Label" parent="SmithNPC/CanvasLayer/MenuPanel/VBox" unique_id=1742900982]
 layout_mode = 2
 text = "— SMITH —"
 horizontal_alignment = 1
 
-[node name="GoldLabel" type="Label" parent="SmithNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="GoldLabel" type="Label" parent="SmithNPC/CanvasLayer/MenuPanel/VBox" unique_id=910512716]
 layout_mode = 2
 text = "Gold: 0"
 
-[node name="Upgrades" type="VBoxContainer" parent="SmithNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="Upgrades" type="VBoxContainer" parent="SmithNPC/CanvasLayer/MenuPanel/VBox" unique_id=2118685494]
 layout_mode = 2
 
-[node name="ResultLabel" type="Label" parent="SmithNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="ResultLabel" type="Label" parent="SmithNPC/CanvasLayer/MenuPanel/VBox" unique_id=133905547]
 layout_mode = 2
 horizontal_alignment = 1
 
-[node name="CloseButton" type="Button" parent="SmithNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="CloseButton" type="Button" parent="SmithNPC/CanvasLayer/MenuPanel/VBox" unique_id=2124643403]
 layout_mode = 2
 text = "Close"
 
-[node name="LabNPC" type="Area2D" parent="."]
+[node name="LabNPC" type="Area2D" parent="." unique_id=63705113]
 position = Vector2(980, 200)
 collision_layer = 64
-collision_mask = 1
 script = ExtResource("5")
 
-[node name="Sprite" type="ColorRect" parent="LabNPC"]
-offset_left = -28
-offset_top = -28
-offset_right = 28
-offset_bottom = 28
+[node name="Sprite" type="ColorRect" parent="LabNPC" unique_id=2078727029]
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
 color = Color(0.3, 0.45, 0.85, 1)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="LabNPC"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LabNPC" unique_id=1311494389]
 shape = SubResource("3")
 
-[node name="Label" type="Label" parent="LabNPC"]
-offset_left = -50
-offset_top = 32
-offset_right = 50
-offset_bottom = 52
+[node name="Label" type="Label" parent="LabNPC" unique_id=234592068]
+visible = false
+offset_left = -50.0
+offset_top = 32.0
+offset_right = 50.0
+offset_bottom = 52.0
 text = "Lab [E]"
 horizontal_alignment = 1
-visible = false
 
-[node name="NPCLabel" type="Label" parent="LabNPC"]
-offset_left = -40
-offset_top = -48
-offset_right = 40
-offset_bottom = -28
+[node name="NPCLabel" type="Label" parent="LabNPC" unique_id=1888353419]
+offset_left = -40.0
+offset_top = -48.0
+offset_right = 40.0
+offset_bottom = -28.0
 text = "LAB"
 horizontal_alignment = 1
 
-[node name="CanvasLayer" type="CanvasLayer" parent="LabNPC"]
+[node name="CanvasLayer" type="CanvasLayer" parent="LabNPC" unique_id=2076526164]
 
-[node name="MenuPanel" type="PanelContainer" parent="LabNPC/CanvasLayer"]
-offset_left = 20
-offset_top = 100
-offset_right = 520
-offset_bottom = 450
+[node name="MenuPanel" type="PanelContainer" parent="LabNPC/CanvasLayer" unique_id=1727329896]
 visible = false
+offset_left = 20.0
+offset_top = 100.0
+offset_right = 520.0
+offset_bottom = 450.0
 
-[node name="VBox" type="VBoxContainer" parent="LabNPC/CanvasLayer/MenuPanel"]
+[node name="VBox" type="VBoxContainer" parent="LabNPC/CanvasLayer/MenuPanel" unique_id=1416118209]
 layout_mode = 2
 
-[node name="Title" type="Label" parent="LabNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="Title" type="Label" parent="LabNPC/CanvasLayer/MenuPanel/VBox" unique_id=416965921]
 layout_mode = 2
 text = "— LAB RESEARCHER —"
 horizontal_alignment = 1
 
-[node name="GoldLabel" type="Label" parent="LabNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="GoldLabel" type="Label" parent="LabNPC/CanvasLayer/MenuPanel/VBox" unique_id=911579663]
 layout_mode = 2
 text = "Gold: 0"
 
-[node name="StorageLabel" type="Label" parent="LabNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="StorageLabel" type="Label" parent="LabNPC/CanvasLayer/MenuPanel/VBox" unique_id=177794880]
 layout_mode = 2
 text = "Stored Minerals: none"
 
-[node name="Services" type="VBoxContainer" parent="LabNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="Services" type="VBoxContainer" parent="LabNPC/CanvasLayer/MenuPanel/VBox" unique_id=487330881]
 layout_mode = 2
 
-[node name="ResultLabel" type="Label" parent="LabNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="ResultLabel" type="Label" parent="LabNPC/CanvasLayer/MenuPanel/VBox" unique_id=1846456677]
 layout_mode = 2
 horizontal_alignment = 1
 
-[node name="CloseButton" type="Button" parent="LabNPC/CanvasLayer/MenuPanel/VBox"]
+[node name="CloseButton" type="Button" parent="LabNPC/CanvasLayer/MenuPanel/VBox" unique_id=964539448]
 layout_mode = 2
 text = "Close"
 
-[node name="MineEntrance" type="Area2D" parent="."]
+[node name="MineEntrance" type="Area2D" parent="." unique_id=712674380]
 position = Vector2(640, 550)
 collision_layer = 64
-collision_mask = 1
 
-[node name="Sprite" type="ColorRect" parent="MineEntrance"]
-offset_left = -48
-offset_top = -30
-offset_right = 48
-offset_bottom = 30
+[node name="Sprite" type="ColorRect" parent="MineEntrance" unique_id=1035041480]
+offset_left = -48.0
+offset_top = -30.0
+offset_right = 48.0
+offset_bottom = 30.0
 color = Color(0.15, 0.1, 0.08, 1)
 
-[node name="Border" type="ColorRect" parent="MineEntrance"]
-offset_left = -52
-offset_top = -34
-offset_right = 52
-offset_bottom = 34
-color = Color(0.6, 0.45, 0.2, 1)
+[node name="Border" type="ColorRect" parent="MineEntrance" unique_id=1707556504]
 z_index = -1
+offset_left = -52.0
+offset_top = -34.0
+offset_right = 52.0
+offset_bottom = 34.0
+color = Color(0.6, 0.45, 0.2, 1)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="MineEntrance"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MineEntrance" unique_id=435619607]
 shape = SubResource("4")
 
-[node name="EntranceLabel" type="Label" parent="MineEntrance"]
-offset_left = -60
-offset_top = -52
-offset_right = 60
-offset_bottom = -32
+[node name="EntranceLabel" type="Label" parent="MineEntrance" unique_id=253421387]
+offset_left = -60.0
+offset_top = -52.0
+offset_right = 60.0
+offset_bottom = -32.0
 text = "MINE ENTRANCE"
 horizontal_alignment = 1
 
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=989768290]
 
-[node name="HUD" type="Control" parent="CanvasLayer"]
+[node name="HUD" type="Control" parent="CanvasLayer" unique_id=294421744]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 
-[node name="StatsLabel" type="Label" parent="CanvasLayer/HUD"]
+[node name="StatsLabel" type="Label" parent="CanvasLayer/HUD" unique_id=794564202]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
 anchor_right = 0.5
-offset_left = -300
-offset_top = 8
-offset_right = 300
-offset_bottom = 32
+offset_left = -300.0
+offset_top = 8.0
+offset_right = 300.0
+offset_bottom = 32.0
+grow_horizontal = 2
 horizontal_alignment = 1
 
-[node name="CheckpointSelector" type="OptionButton" parent="CanvasLayer/HUD"]
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -120
-offset_top = -70
-offset_right = 120
-offset_bottom = -42
+[node name="CheckpointSelector" type="OptionButton" parent="CanvasLayer/HUD" unique_id=1201533129]
 visible = false
-
-[node name="MineButton" type="Button" parent="CanvasLayer/HUD"]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -80
-offset_top = -38
-offset_right = 80
-offset_bottom = -8
+offset_left = -120.0
+offset_top = -70.0
+offset_right = 120.0
+offset_bottom = -42.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="MineButton" type="Button" parent="CanvasLayer/HUD" unique_id=716158264]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -80.0
+offset_top = -38.0
+offset_right = 80.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 0
 text = "ENTER MINE"
-visible = false
 
-[node name="SellButton" type="Button" parent="CanvasLayer/HUD"]
+[node name="SellButton" type="Button" parent="CanvasLayer/HUD" unique_id=495195830]
+visible = false
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -180
-offset_top = 8
-offset_right = -10
-offset_bottom = 36
+offset_left = -180.0
+offset_top = 8.0
+offset_right = -10.0
+offset_bottom = 36.0
+grow_horizontal = 0
 text = "Sell All Ore"
-visible = false
 
-[node name="SellResult" type="Label" parent="CanvasLayer/HUD"]
+[node name="SellResult" type="Label" parent="CanvasLayer/HUD" unique_id=633863877]
+visible = false
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -200
-offset_top = 40
-offset_right = -10
-offset_bottom = 60
+offset_left = -200.0
+offset_top = 40.0
+offset_right = -10.0
+offset_bottom = 60.0
+grow_horizontal = 0
 horizontal_alignment = 2
-visible = false

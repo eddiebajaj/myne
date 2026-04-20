@@ -30,9 +30,13 @@ func _ready() -> void:
 	# Ensure game is not paused (in case we came from a paused build menu)
 	get_tree().paused = false
 	player.add_to_group("player")
-	# Position player near stairs up (randomized per sprint 2c). Offset slightly
-	# downward so the player doesn't overlap the stair collider on spawn.
-	player.position = floor_generator.stairs_up_position + Vector2(0, 40)
+	# Position player near stairs up (randomized per sprint 2c). Template floors
+	# offset downward so the player doesn't overlap the stair collider; procgen
+	# floors spawn directly on the stairs cell to avoid clipping into cave walls.
+	if floor_generator._is_procgen:
+		player.position = floor_generator.stairs_up_position
+	else:
+		player.position = floor_generator.stairs_up_position + Vector2(0, 40)
 	# Wire up HUD
 	hud.set_player(player)
 	# Camera

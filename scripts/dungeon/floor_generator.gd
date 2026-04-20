@@ -8,6 +8,26 @@ const FLOOR_WIDTH := 1400.0
 const FLOOR_HEIGHT := 1000.0
 const WALL_THICKNESS := 32.0
 
+# Sprint 9 procgen constants.
+const PROCGEN_GRID_WIDTH := 70  # cells (× 20px tile = 1400px world)
+const PROCGEN_GRID_HEIGHT := 50  # cells (× 20px tile = 1000px world)
+const PROCGEN_TILE_SIZE := 20.0
+const PROCGEN_CHANCE := 0.8  # 80% procgen, 20% template
+# If the largest connected floor region has fewer than this many cells, the
+# procgen result is treated as degenerate and we fall back to a template.
+const PROCGEN_MIN_FLOOR_CELLS := 300
+
+# Run-level seed. Held static so re-entering a floor during the same run
+# reproduces the layout (matches spec §A1: seed = floor + run_seed).
+# Reseeded each time GameManager.start_run() fires via reset_run_seed().
+static var _run_seed: int = randi()
+
+
+## Called by GameManager.start_run() to rotate the procgen seed per run.
+## Public so tests and the town screen can force a reroll if ever needed.
+static func reset_run_seed() -> void:
+	_run_seed = randi()
+
 var ore_types: Array[OreData] = []
 var all_minerals: Array[MineralData] = []
 var ore_node_scene: PackedScene
@@ -19,6 +39,13 @@ var floor_time: float = 0.0  # Track time on floor for rock portal trigger
 var _occupied_positions: Array[Dictionary] = []  # Each entry: {"pos": Vector2, "radius": float}
 var stairs_up_position: Vector2 = Vector2.ZERO  # Set by _spawn_stairs_up(); consumed by controller + wanderer spawner
 var _current_template: Dictionary = {}  # Active floor template (from FloorTemplates.TEMPLATES)
+# Sprint 9 procgen state. _is_procgen toggles spawn masking; _floor_cell_pool
+# is the Array[Vector2i] of grid-space floor cells; _exit_grid_cell is where
+# the stairs-hiding rock will land (BFS-farthest from spawn).
+var _is_procgen: bool = false
+var _floor_cell_pool: Array[Vector2i] = []
+var _spawn_grid_cell: Vector2i = Vector2i.ZERO
+var _exit_grid_cell: Vector2i = Vector2i.ZERO
 
 @onready var walls: Node2D = $Walls
 @onready var ore_container: Node2D = $OreNodes
@@ -39,11 +66,24 @@ func _process(delta: float) -> void:
 func generate_floor() -> void:
 	floor_time = 0.0
 	_occupied_positions.clear()
-	_current_template = _pick_template()
-	_create_walls()
-	_create_interior_walls()
-	# Stairs-up first so it reserves its slot before anything else claims it.
-	_spawn_stairs_up()
+	_is_procgen = false
+	_floor_cell_pool.clear()
+	_current_template = {}
+	# Sprint 9: procgen-vs-template roll. Deterministic per floor + run_seed so
+	# re-entering the same floor during a single run keeps the same layout.
+	var choice_rng := RandomNumberGenerator.new()
+	choice_rng.seed = GameManager.current_floor + _run_seed
+	var want_procgen: bool = choice_rng.randf() < PROCGEN_CHANCE
+	if want_procgen and _try_generate_procgen():
+		# Procgen path handled walls + spawn/exit reservations.
+		pass
+	else:
+		_current_template = _pick_template()
+		_create_walls()
+		_create_interior_walls()
+		# Stairs-up first so it reserves its slot before anything else claims it.
+		_spawn_stairs_up()
+
 	_spawn_ore_nodes()
 	_spawn_rocks()
 	_spawn_floor_wanderers()
@@ -55,6 +95,131 @@ func generate_floor() -> void:
 	# Blueprint drops — Scout blueprint on B4 (first visit only).
 	if GameManager.current_floor == 4 and not ("scout" in Inventory.blueprints):
 		_spawn_blueprint("scout", "Scout")
+
+
+# === Sprint 9 procgen path ===
+
+func _get_cave_params() -> Dictionary:
+	var floor_num: int = GameManager.current_floor
+	if floor_num <= 3:
+		return {"wall_chance": 0.40, "iterations": 4}
+	elif floor_num <= 5:
+		return {"wall_chance": 0.45, "iterations": 4}
+	else:
+		return {"wall_chance": 0.50, "iterations": 5}
+
+
+func _try_generate_procgen() -> bool:
+	## Run cave_gen, validate the result, and if it's playable: build walls,
+	## pick spawn+exit, spawn stairs-up. Returns false on degenerate grids so
+	## the caller can fall back to a template floor.
+	var params: Dictionary = _get_cave_params()
+	var gen_seed: int = GameManager.current_floor + _run_seed
+	var raw: Array = CaveGen.generate(
+		PROCGEN_GRID_WIDTH,
+		PROCGEN_GRID_HEIGHT,
+		params["wall_chance"],
+		params["iterations"],
+		gen_seed
+	)
+	var grid: Array = CaveGen.extract_largest_floor_region(raw)
+	var floor_cells: Array[Vector2i] = CaveGen.floor_cell_positions(grid)
+	if floor_cells.size() < PROCGEN_MIN_FLOOR_CELLS:
+		return false
+
+	_is_procgen = true
+	_floor_cell_pool = floor_cells
+
+	# Pick player spawn: prefer a floor cell in the top-left quadrant for the
+	# classic "stairs are near where you came in" feel. If the quadrant is
+	# empty (rare on tight seeds), fall back to any floor cell.
+	var spawn_rng := RandomNumberGenerator.new()
+	spawn_rng.seed = gen_seed ^ 0xA5A5A5A5
+	var quad_cells: Array[Vector2i] = []
+	var quad_w: int = PROCGEN_GRID_WIDTH / 2
+	var quad_h: int = PROCGEN_GRID_HEIGHT / 2
+	for c in floor_cells:
+		if c.x < quad_w and c.y < quad_h:
+			quad_cells.append(c)
+	if quad_cells.is_empty():
+		_spawn_grid_cell = floor_cells[spawn_rng.randi_range(0, floor_cells.size() - 1)]
+	else:
+		_spawn_grid_cell = quad_cells[spawn_rng.randi_range(0, quad_cells.size() - 1)]
+
+	# Exit = BFS-farthest floor cell from spawn.
+	_exit_grid_cell = CaveGen.bfs_farthest_floor_cell(grid, _spawn_grid_cell.x, _spawn_grid_cell.y)
+
+	# Build walls (per-tile StaticBody2D — Pillar B will migrate to TileMap).
+	_spawn_procgen_walls(grid)
+	# Match template path: reserve spawn slot, stash for controller consumption.
+	var spawn_world: Vector2 = _grid_to_world(_spawn_grid_cell)
+	stairs_up_position = spawn_world
+	_occupied_positions.append({"pos": spawn_world, "radius": 80.0})
+	# Spawn the Stairs Up area at the chosen floor cell.
+	var up: Area2D = stairs_scene.instantiate()
+	up.stair_type = Stairs.StairType.UP
+	up.position = spawn_world
+	entities.add_child(up)
+	return true
+
+
+func _spawn_procgen_walls(grid: Array) -> void:
+	## Spawn a per-cell StaticBody2D for every wall tile. Flagged as debt:
+	## Pillar B.3 will replace with a single TileMap node.
+	var wall_color := Color(0.4, 0.32, 0.25)  # matches _add_wall() color
+	var tile_size := Vector2(PROCGEN_TILE_SIZE, PROCGEN_TILE_SIZE)
+	for y in range(grid.size()):
+		var row: Array = grid[y]
+		for x in range(row.size()):
+			if not row[x]:
+				continue
+			var body := StaticBody2D.new()
+			body.collision_layer = 16
+			body.position = Vector2(
+				x * PROCGEN_TILE_SIZE + PROCGEN_TILE_SIZE / 2.0,
+				y * PROCGEN_TILE_SIZE + PROCGEN_TILE_SIZE / 2.0
+			)
+			var col := CollisionShape2D.new()
+			var shape := RectangleShape2D.new()
+			shape.size = tile_size
+			col.shape = shape
+			body.add_child(col)
+			var rect := ColorRect.new()
+			rect.size = tile_size
+			rect.position = -tile_size / 2.0
+			rect.color = wall_color
+			body.add_child(rect)
+			walls.add_child(body)
+
+
+func _grid_to_world(cell: Vector2i) -> Vector2:
+	return Vector2(
+		cell.x * PROCGEN_TILE_SIZE + PROCGEN_TILE_SIZE / 2.0,
+		cell.y * PROCGEN_TILE_SIZE + PROCGEN_TILE_SIZE / 2.0
+	)
+
+
+func _pick_pool_position(min_separation: float, max_attempts: int = 20) -> Vector2:
+	## Procgen variant of _reserve_position: samples floor-cell pool instead of
+	## random-in-rectangle. Rejects cells that are too close to previously
+	## reserved entities. Falls back to last candidate if all attempts fail.
+	if _floor_cell_pool.is_empty():
+		return _random_floor_position(0.0)
+	var pool_max: int = _floor_cell_pool.size() - 1
+	var candidate: Vector2 = _grid_to_world(_floor_cell_pool[randi_range(0, pool_max)])
+	for attempt in range(max_attempts):
+		candidate = _grid_to_world(_floor_cell_pool[randi_range(0, pool_max)])
+		var ok: bool = true
+		for entry in _occupied_positions:
+			var other_pos: Vector2 = entry["pos"]
+			var other_radius: float = entry["radius"]
+			if candidate.distance_to(other_pos) < (min_separation + other_radius):
+				ok = false
+				break
+		if ok:
+			break
+	_occupied_positions.append({"pos": candidate, "radius": min_separation})
+	return candidate
 
 
 # === Ore spawning ===
@@ -74,7 +239,11 @@ func _spawn_ore_nodes() -> void:
 			mineral_roll += 0.15
 		if randf() < mineral_roll:
 			mineral = all_minerals[randi() % all_minerals.size()]
-		var pos: Vector2 = _reserve_position(60.0, 40.0, 20, ore_zone)
+		var pos: Vector2
+		if _is_procgen:
+			pos = _pick_pool_position(40.0, 20)
+		else:
+			pos = _reserve_position(60.0, 40.0, 20, ore_zone)
 		spawn_ore_node_at(pos, ore, mineral)
 
 
@@ -164,18 +333,28 @@ func _spawn_rocks() -> void:
 		rock_types.append("empty")
 	# Shuffle
 	rock_types.shuffle()
-	# Zone lookups for biased spawning
+	# Zone lookups for biased spawning (template path only).
 	var zones: Dictionary = _current_template["zones"] if not _current_template.is_empty() else {}
 	var stairs_down_zone = zones.get("stairs_down_rock")
 	var rock_zone = zones.get("rocks")
-	# Spawn rocks spread across the floor
+	# Spawn rocks spread across the floor.
 	for i in range(rock_types.size()):
-		var zone = null
-		if rock_types[i] == "stairs":
-			zone = stairs_down_zone
-		elif rock_zone != null:
-			zone = rock_zone
-		var pos: Vector2 = _reserve_position(50.0, 38.0, 20, zone)
+		var pos: Vector2
+		if _is_procgen:
+			if rock_types[i] == "stairs":
+				# Place the stairs-hiding rock at the BFS-farthest cell so the
+				# player has to cross the cave to find the exit.
+				pos = _grid_to_world(_exit_grid_cell)
+				_occupied_positions.append({"pos": pos, "radius": 38.0})
+			else:
+				pos = _pick_pool_position(38.0, 20)
+		else:
+			var zone = null
+			if rock_types[i] == "stairs":
+				zone = stairs_down_zone
+			elif rock_zone != null:
+				zone = rock_zone
+			pos = _reserve_position(50.0, 38.0, 20, zone)
 		var rock: StaticBody2D = rock_scene.instantiate()
 		rock.global_position = pos
 		rock.rock_content = rock_types[i]
@@ -218,9 +397,12 @@ func spawn_rock_triggered_portal(pos: Vector2) -> void:
 # === Cave ===
 
 func _spawn_cave() -> void:
-	var cave_zone = _current_template["zones"].get("cave") if not _current_template.is_empty() else null
 	var cave: Area2D = cave_scene.instantiate()
-	cave.position = _reserve_position(100.0, 80.0, 20, cave_zone)
+	if _is_procgen:
+		cave.position = _pick_pool_position(80.0, 20)
+	else:
+		var cave_zone = _current_template["zones"].get("cave") if not _current_template.is_empty() else null
+		cave.position = _reserve_position(100.0, 80.0, 20, cave_zone)
 	entities.add_child(cave)
 
 
@@ -228,7 +410,10 @@ func _spawn_cave() -> void:
 
 func _spawn_portal() -> void:
 	var portal: Node2D = portal_scene.instantiate()
-	portal.position = _reserve_position(80.0, 50.0)
+	if _is_procgen:
+		portal.position = _pick_pool_position(50.0, 20)
+	else:
+		portal.position = _reserve_position(80.0, 50.0)
 	entities.add_child(portal)
 
 
@@ -236,7 +421,10 @@ func _spawn_blueprint(bot_id: String, display_name: String) -> void:
 	## Drop a walk-over blueprint pickup at a random free floor position.
 	var bp: Area2D = Area2D.new()
 	bp.set_script(load("res://scripts/dungeon/blueprint_pickup.gd"))
-	bp.position = _reserve_position(50.0, 40.0)
+	if _is_procgen:
+		bp.position = _pick_pool_position(40.0, 20)
+	else:
+		bp.position = _reserve_position(50.0, 40.0)
 	entities.add_child(bp)
 	bp.setup(bot_id, display_name)
 
@@ -334,9 +522,9 @@ func _roll_wanderer_position(player_spawn: Vector2, placed: Array[Vector2]) -> V
 	## Rejection-roll a wanderer spawn position: 300-650 px from player,
 	## >=120 px from other wanderers, not too close to walls or other entities.
 	## 5 retries then accept.
-	var best: Vector2 = _reserve_position(60.0, 50.0)
+	var best: Vector2 = _next_wanderer_candidate()
 	for attempt in range(5):
-		var candidate: Vector2 = _reserve_position(60.0, 50.0)
+		var candidate: Vector2 = _next_wanderer_candidate()
 		var d_player: float = candidate.distance_to(player_spawn)
 		if d_player < 300.0 or d_player > 650.0:
 			continue
@@ -349,6 +537,12 @@ func _roll_wanderer_position(player_spawn: Vector2, placed: Array[Vector2]) -> V
 			continue
 		return candidate
 	return best
+
+
+func _next_wanderer_candidate() -> Vector2:
+	if _is_procgen:
+		return _pick_pool_position(50.0, 10)
+	return _reserve_position(60.0, 50.0)
 
 
 func _random_enemy() -> EnemyData:
