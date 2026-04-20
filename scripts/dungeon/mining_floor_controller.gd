@@ -29,6 +29,10 @@ const BOT_TYPE_DISPLAY_NAMES: Dictionary = {
 func _ready() -> void:
 	# Ensure game is not paused (in case we came from a paused build menu)
 	get_tree().paused = false
+	# Sprint 9 B.3: overlay a tiled Kenney floor texture on top of the dark
+	# ColorRect background. If the asset folder is missing, the overlay is
+	# skipped and the ColorRect shows through unchanged.
+	_setup_floor_background()
 	player.add_to_group("player")
 	# Position player near stairs up (randomized per sprint 2c). Template floors
 	# offset downward so the player doesn't overlap the stair collider; procgen
@@ -46,6 +50,41 @@ func _ready() -> void:
 	camera.limit_bottom = int(FloorGenerator.FLOOR_HEIGHT)
 	# Spawn permanent companion bots from run party
 	_respawn_permanent_bots()
+
+
+func _setup_floor_background() -> void:
+	## Add a tiled Kenney floor texture as an underlayer. Sits behind walls /
+	## entities / player but above the dark ColorRect Background. The ColorRect
+	## stays as a fallback — if the atlas fails to load, the dark color shows
+	## through unchanged.
+	var floor_atlas: AtlasTexture = SpriteUtil.load_atlas_region(
+		AssetPaths.CAVES_SHEET,
+		AssetPaths.tile_rect(AssetPaths.FLOOR_TILE["col"], AssetPaths.FLOOR_TILE["row"])
+	)
+	if floor_atlas == null:
+		return
+	# Push the fallback Background ColorRect below our textured layer so the
+	# tile texture actually covers it. ColorRect still shows through any gaps
+	# and provides the fallback if this function returns early (above).
+	var bg_rect: ColorRect = get_node_or_null("Background") as ColorRect
+	if bg_rect != null:
+		bg_rect.z_index = -20
+	var bg_tex := TextureRect.new()
+	bg_tex.name = "FloorTileBackground"
+	bg_tex.texture = floor_atlas
+	bg_tex.stretch_mode = TextureRect.STRETCH_TILE
+	bg_tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	bg_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# Scale by 20/16 = 1.25 so each 16px Kenney tile = 20px on-screen,
+	# matching PROCGEN_TILE_SIZE.
+	var display_scale: float = FloorGenerator.PROCGEN_TILE_SIZE / float(AssetPaths.TILE_SIZE)
+	bg_tex.scale = Vector2(display_scale, display_scale)
+	bg_tex.size = Vector2(FloorGenerator.FLOOR_WIDTH, FloorGenerator.FLOOR_HEIGHT) / display_scale
+	bg_tex.position = Vector2.ZERO
+	# Sprint 9 z-order: floor texture above ColorRect (-20) but below walls,
+	# entities, and player (all default z=0).
+	bg_tex.z_index = -10
+	add_child(bg_tex)
 
 
 func _respawn_permanent_bots() -> void:

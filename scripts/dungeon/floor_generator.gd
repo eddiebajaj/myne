@@ -165,9 +165,20 @@ func _try_generate_procgen() -> bool:
 
 func _spawn_procgen_walls(grid: Array) -> void:
 	## Spawn a per-cell StaticBody2D for every wall tile. Flagged as debt:
-	## Pillar B.3 will replace with a single TileMap node.
-	var wall_color := Color(0.4, 0.32, 0.25)  # matches _add_wall() color
+	## the pragmatic visual swap (Sprint 9 B.3) replaces the ColorRect visual
+	## with a Kenney atlas Sprite2D; full TileMap migration is still deferred.
+	var wall_color := Color(0.4, 0.32, 0.25)  # ColorRect fallback (matches _add_wall())
 	var tile_size := Vector2(PROCGEN_TILE_SIZE, PROCGEN_TILE_SIZE)
+	# Pre-load the atlas region once — every wall tile shares the same AtlasTexture.
+	var wall_atlas: AtlasTexture = SpriteUtil.load_atlas_region(
+		AssetPaths.CAVES_SHEET,
+		AssetPaths.tile_rect(AssetPaths.WALL_TILE["col"], AssetPaths.WALL_TILE["row"])
+	)
+	# Scale 16px Kenney → 20px PROCGEN_TILE_SIZE on screen.
+	var sprite_scale := Vector2(
+		PROCGEN_TILE_SIZE / float(AssetPaths.TILE_SIZE),
+		PROCGEN_TILE_SIZE / float(AssetPaths.TILE_SIZE)
+	)
 	for y in range(grid.size()):
 		var row: Array = grid[y]
 		for x in range(row.size()):
@@ -184,11 +195,19 @@ func _spawn_procgen_walls(grid: Array) -> void:
 			shape.size = tile_size
 			col.shape = shape
 			body.add_child(col)
-			var rect := ColorRect.new()
-			rect.size = tile_size
-			rect.position = -tile_size / 2.0
-			rect.color = wall_color
-			body.add_child(rect)
+			if wall_atlas != null:
+				var sprite := Sprite2D.new()
+				sprite.texture = wall_atlas
+				sprite.centered = true
+				sprite.scale = sprite_scale
+				body.add_child(sprite)
+			else:
+				# Fallback: preserve original ColorRect visual if the asset folder is missing.
+				var rect := ColorRect.new()
+				rect.size = tile_size
+				rect.position = -tile_size / 2.0
+				rect.color = wall_color
+				body.add_child(rect)
 			walls.add_child(body)
 
 
@@ -653,11 +672,33 @@ func _add_wall(pos: Vector2, size: Vector2) -> void:
 	shape.size = size
 	col.shape = shape
 	wall.add_child(col)
-	var rect := ColorRect.new()
-	rect.size = size
-	rect.position = -size / 2
-	rect.color = Color(0.4, 0.32, 0.25)
-	wall.add_child(rect)
+	# Prefer Kenney wall texture (tile-repeated across the wall rect).
+	# Fallback to the original ColorRect if the asset folder is missing.
+	var wall_atlas: AtlasTexture = SpriteUtil.load_atlas_region(
+		AssetPaths.CAVES_SHEET,
+		AssetPaths.tile_rect(AssetPaths.WALL_TILE["col"], AssetPaths.WALL_TILE["row"])
+	)
+	if wall_atlas != null:
+		# TextureRect with STRETCH_TILE repeats the 16px tile at its native size.
+		# Scale the node by 20/16 = 1.25 so one repeat = 20px on-screen,
+		# matching PROCGEN_TILE_SIZE. Then size the node so it still covers the
+		# wall rect after scaling (size / scale).
+		var display_scale: float = PROCGEN_TILE_SIZE / float(AssetPaths.TILE_SIZE)
+		var tex_rect := TextureRect.new()
+		tex_rect.texture = wall_atlas
+		tex_rect.stretch_mode = TextureRect.STRETCH_TILE
+		tex_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		tex_rect.scale = Vector2(display_scale, display_scale)
+		tex_rect.size = size / display_scale
+		tex_rect.position = (-size / 2) / display_scale
+		tex_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		wall.add_child(tex_rect)
+	else:
+		var rect := ColorRect.new()
+		rect.size = size
+		rect.position = -size / 2
+		rect.color = Color(0.4, 0.32, 0.25)
+		wall.add_child(rect)
 	walls.add_child(wall)
 
 

@@ -33,6 +33,8 @@ Carried forward each sprint. Items are added when deferred, removed when resolve
 | D28 | Ice/Thunder/Venom on-hit mechanics | Sprint 7 | Medium | Counts stored as bot meta; no runtime hit code consumes them yet |
 | D29 | Market tab conversion | Sprint 8 | Low | Deferred — no Buy flow exists yet. Revisit when Trader NPC or Buy content designed |
 | D30 | Legacy upgraded-bot stat drift | Sprint 8 | Low | Migration collapses `hp_upgrade_level`/`damage_upgrade_level` into `upgrade_level` via max-of-the-two. Stats may shift slightly for bots upgraded in Sprint 5-6 |
+| D31 | TileMap migration for walls/floor | Sprint 9 | Medium | Sprint 9 pragmatic path kept per-tile `StaticBody2D` + Sprite2D. TileMapLayer would batch ~3500 bodies into one physics body + aggregated collision. ~3-4 hours: create TileSet .tres, rewrite `_spawn_procgen_walls`, verify collision behavior |
+| D32 | Backpack UI ore sprites | Sprint 9 | Low | Backpack grid cells still use StyleBoxFlat.bg_color from ore.color. World ore nodes converted to Kenney sprites in Pillar B.4; UI cells need TextureRect replacement |
 
 ## Resolved (Sprint 8)
 

@@ -47,31 +47,65 @@ func setup(data: OreData, mineral_mod: MineralData = null) -> void:
 
 
 func _try_apply_texture() -> void:
-	## If a pixel-art texture exists at res://resources/sprites/ores/<id>.png,
-	## add a Sprite2D child and hide the ColorRect fallback. Mineral glow stays
-	## as-is so it still indicates modifiers.
+	## Visual priority, in order:
+	##   1. Kenney atlas region from AssetPaths.ORE_SPRITES[ore.id]
+	##   2. Per-ore PNG at res://resources/sprites/ores/<id>.png (legacy path)
+	##   3. ColorRect fallback (sprite.color = ore.color)
+	## Mineral modifier is indicated via (a) mineral_glow ColorRect (handled in
+	## setup()) and (b) `modulate` on the textured sprite so the ore itself
+	## picks up the mineral tint — e.g. fire ore runs red, ice ore runs cyan.
 	if ore_data == null or ore_data.id.is_empty():
 		return
 	var existing := get_node_or_null("BodyTexture") as Sprite2D
-	var tex_path: String = "res://resources/sprites/ores/%s.png" % ore_data.id
+	if existing:
+		existing.queue_free()
+
 	var sprite_size: Vector2 = Vector2(32, 32)
 	if sprite:
 		sprite_size = sprite.size
-	var tex_sprite: Sprite2D = SpriteUtil.try_load_sprite(tex_path, sprite_size)
+
+	var tex_sprite: Sprite2D = _try_load_atlas_sprite(sprite_size)
+	if tex_sprite == null:
+		# Legacy per-ore PNG path (kept so custom art still overrides the atlas).
+		var tex_path: String = "res://resources/sprites/ores/%s.png" % ore_data.id
+		tex_sprite = SpriteUtil.try_load_sprite(tex_path, sprite_size)
+
 	if tex_sprite:
 		tex_sprite.name = "BodyTexture"
-		if existing:
-			existing.queue_free()
+		# Mineral ores get their tint applied to the sprite itself.
+		if mineral != null:
+			tex_sprite.modulate = mineral.color
 		add_child(tex_sprite)
 		if sprite:
 			sprite.visible = false
 	else:
-		# No texture: make sure any stale texture from a previous setup is gone
-		# and the ColorRect fallback is visible.
-		if existing:
-			existing.queue_free()
+		# No texture available — keep the ColorRect fallback visible.
 		if sprite:
 			sprite.visible = true
+
+
+func _try_load_atlas_sprite(_size: Vector2) -> Sprite2D:
+	## Returns a centered Sprite2D showing the Kenney ore tile for this ore id,
+	## or null if ORE_SPRITES has no entry or the atlas fails to load.
+	## [_size] is threaded for future auto-scaling off the ColorRect slot;
+	## currently we use a fixed ~16px ore scale that reads well on a 32px tile.
+	if not AssetPaths.ORE_SPRITES.has(ore_data.id):
+		return null
+	var info: Dictionary = AssetPaths.ORE_SPRITES[ore_data.id]
+	if not (info.has("sheet") and info.has("col") and info.has("row")):
+		return null
+	var rect: Rect2 = AssetPaths.tile_rect(int(info["col"]), int(info["row"]))
+	var atlas: AtlasTexture = SpriteUtil.load_atlas_region(String(info["sheet"]), rect)
+	if atlas == null:
+		return null
+	var tex_sprite := Sprite2D.new()
+	tex_sprite.texture = atlas
+	tex_sprite.centered = true
+	# Kenney tile is 16px. Ores read best at ~16-20px (a bit smaller than
+	# 32px walls/floor) so they feel like objects *on* the tile, not *as*
+	# the tile. TUNE: bump to 1.25 if Eddie wants ores chunkier.
+	tex_sprite.scale = Vector2(1.0, 1.0)
+	return tex_sprite
 
 
 func take_hit(power: int = 1) -> void:
