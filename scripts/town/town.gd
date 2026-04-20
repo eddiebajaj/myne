@@ -774,6 +774,12 @@ func _get_focused_storage_button_index() -> int:
 
 
 func _focus_storage_button_at_index(idx: int) -> void:
+	# Defer focus restoration to the next frame so any queue_free'd old focus
+	# owner is fully gone and Godot's internal focus state has settled. See the
+	# matching comment in npc_lab.gd — plain call_deferred races with the
+	# previous focus owner's tree_exiting (which clears focus) and occasionally
+	# loses, leaving the player with no focused button.
+	await get_tree().process_frame
 	var focusables: Array = _collect_storage_focusables()
 	if focusables.is_empty():
 		# No rows left (backpack emptied after deposit-all, etc.) — bounce to
@@ -781,7 +787,7 @@ func _focus_storage_button_at_index(idx: int) -> void:
 		if storage_tab_bar:
 			storage_tab_bar.focus_active()
 		elif storage_close_btn:
-			storage_close_btn.call_deferred("grab_focus")
+			storage_close_btn.grab_focus()
 		return
 	idx = clampi(idx, 0, focusables.size() - 1)
 	var ctrl: Control = focusables[idx]
@@ -789,9 +795,9 @@ func _focus_storage_button_at_index(idx: int) -> void:
 		# Prefer a non-disabled button if one exists nearby.
 		for alt in focusables:
 			if alt is Button and not alt.disabled:
-				alt.call_deferred("grab_focus")
+				alt.grab_focus()
 				return
-	ctrl.call_deferred("grab_focus")
+	ctrl.grab_focus()
 
 
 func _storage_stack_name(slot: Dictionary) -> String:

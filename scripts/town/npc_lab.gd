@@ -308,14 +308,21 @@ func _get_focused_button_index() -> int:
 
 
 func _focus_button_at_index(idx: int) -> void:
+	# Defer focus restoration to the next frame so any queue_free'd old focus
+	# owner is fully gone and Godot's internal focus state has settled. A plain
+	# call_deferred("grab_focus") races with the old focus owner's tree_exiting
+	# (which silently clears focus) — on some frames the clear wins and the
+	# player sees focus disappear. Awaiting process_frame ensures we grab focus
+	# cleanly after all pending deferred work is done.
+	await get_tree().process_frame
 	var focusables := FocusUtil.collect_focusables(services_container)
 	focusables = focusables.filter(func(c): return not c.is_queued_for_deletion())
 	focusables.append(close_button)
 	if focusables.is_empty():
-		close_button.call_deferred("grab_focus")
+		close_button.grab_focus()
 		return
 	idx = clampi(idx, 0, focusables.size() - 1)
-	focusables[idx].call_deferred("grab_focus")
+	focusables[idx].grab_focus()
 
 
 func _focus_first_button() -> void:
