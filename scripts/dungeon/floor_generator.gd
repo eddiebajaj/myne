@@ -796,11 +796,14 @@ func _build_ore_node_scene() -> PackedScene:
 	rect.size = Vector2(32, 32)
 	rect.position = Vector2(-16, -16)
 	root.add_child(rect); rect.owner = root
-	# Mineral glow (slightly larger, behind sprite)
+	# Mineral glow — sized just a bit larger than the 16px Kenney ore sprite
+	# so the tint reads as a halo, not a big rectangle behind a small gem
+	# (Sprint 9 post-playtest: old 38×38 halo looked like a "rectangle" framing
+	# the small 16px sprite).
 	var glow := ColorRect.new()
 	glow.name = "MineralGlow"
-	glow.size = Vector2(38, 38)
-	glow.position = Vector2(-19, -19)
+	glow.size = Vector2(22, 22)
+	glow.position = Vector2(-11, -11)
 	glow.visible = false
 	glow.show_behind_parent = true
 	root.add_child(glow); glow.owner = root

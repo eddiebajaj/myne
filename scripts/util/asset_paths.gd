@@ -43,36 +43,36 @@ static func tile_rect(col: int, row: int) -> Rect2:
 const PLAYER_SPRITE := {"sheet": CHARACTER_SHEET, "col": 0, "row": 0}
 
 # Walls — caves sheet has solid grey stone-wall blocks in the mid-upper region.
-# Col 6, row 2 reads as a plain stone block (no top-edge cap) — works as a
-# generic wall face tile when tiled in any direction.
-# TUNE: Eddie — other clean options are (col 7, row 2) and (col 6, row 3).
-# Col 6, row 0-1 have top-edge highlights if you want a ceiling-capped look.
-const WALL_TILE := {"sheet": CAVES_SHEET, "col": 6, "row": 2}
+# Sprint 9 post-playtest: (6, 2) was hitting a decorative/transparent tile
+# (Eddie: "wall is transparent dots"). Picking (8, 3) — deep inside the solid
+# grey stone block, no edge caps, no decorations.
+# TUNE: Eddie — (9, 3) and (10, 3) are equivalent; (7, 3) and (8, 2) also work.
+const WALL_TILE := {"sheet": CAVES_SHEET, "col": 8, "row": 3}
 
 # Floor — plain brown/tan dirt floor tile from the floor grid.
-# Col 6, row 5 is a solid dirt tile that tiles cleanly.
-# TUNE: (col 7, row 5) is similar; (col 4-5, row 8) is a cooler stone variant.
-const FLOOR_TILE := {"sheet": CAVES_SHEET, "col": 6, "row": 5}
+# Sprint 9 post-playtest: (6, 5) was in a transition area. Picking (12, 4),
+# which sits in the solid brown dirt region (cols 11-14, rows 3-5 are all
+# plain brown dirt, no edges or decoration).
+# TUNE: (11, 4), (13, 4), (12, 3) are all similar solid brown tiles.
+const FLOOR_TILE := {"sheet": CAVES_SHEET, "col": 12, "row": 4}
 
 # Ores T1..T4 — keyed by OreData.id (matches _create_ore_types in
-# floor_generator.gd). Caves sheet has small ore-pebble sprites in the
-# top-left area (rows ~2-3) and colored gem sprites in the middle area
-# (rows ~7-8). Mineral tints are still applied via `modulate` on top of
-# these sprites. Missing entries or load failures fall through to the
-# ColorRect fallback in ore_node.gd.
+# floor_generator.gd). Sprint 9 post-playtest: re-picked from the actual gem
+# cluster in the sheet. Gems sit in roughly cols 7-13, rows 8-9 — 8 distinct
+# small colored gem sprites. Mineral tints are still applied via `modulate`
+# on top of these sprites. Missing entries or load failures fall through to
+# the ColorRect fallback in ore_node.gd.
 #
-# TUNE: Eddie — these coords are first-pass picks from eyeballing the
-# sheet preview. Rough regions:
-#   - col 0-2, row 2: grey / brown / yellow pebble clumps (T1–T2 fits)
-#   - col 5-8, row 7-8: colored gem sprites (T3–T4 flashier look)
-# Adjust (col, row) per ore to taste.
+# TUNE: Eddie — if a gem reads as the wrong colour on-screen, the tile coords
+# here are easier to swap than the sheet. Adjacent cells in the gem cluster
+# are all viable alternatives.
 const ORE_SPRITES := {
-	"iron":     {"sheet": CAVES_SHEET, "col": 0, "row": 2},  # grey pebble cluster
-	"copper":   {"sheet": CAVES_SHEET, "col": 1, "row": 2},  # brown/orange pebble
-	"crystal":  {"sheet": CAVES_SHEET, "col": 5, "row": 7},  # blue gem
-	"silver":   {"sheet": CAVES_SHEET, "col": 2, "row": 2},  # pale/yellow pebble
-	"gold_ore": {"sheet": CAVES_SHEET, "col": 6, "row": 7},  # yellow gem
-	"obsidian": {"sheet": CAVES_SHEET, "col": 7, "row": 8},  # dark/purple gem
-	"diamond":  {"sheet": CAVES_SHEET, "col": 5, "row": 8},  # light cyan gem
-	"mythril":  {"sheet": CAVES_SHEET, "col": 6, "row": 8},  # magenta/purple gem
+	"iron":     {"sheet": CAVES_SHEET, "col": 8,  "row": 8},   # grey/silver gem
+	"copper":   {"sheet": CAVES_SHEET, "col": 10, "row": 9},   # orange/brown gem
+	"crystal":  {"sheet": CAVES_SHEET, "col": 9,  "row": 8},   # blue/cyan gem
+	"silver":   {"sheet": CAVES_SHEET, "col": 11, "row": 8},   # pale/white gem
+	"gold_ore": {"sheet": CAVES_SHEET, "col": 7,  "row": 9},   # yellow gem
+	"obsidian": {"sheet": CAVES_SHEET, "col": 13, "row": 9},   # dark/black gem
+	"diamond":  {"sheet": CAVES_SHEET, "col": 12, "row": 8},   # clear/white gem
+	"mythril":  {"sheet": CAVES_SHEET, "col": 11, "row": 9},   # purple/magenta gem
 }
