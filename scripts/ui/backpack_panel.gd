@@ -197,7 +197,7 @@ func _on_cell_gui_input(event: InputEvent, cell: Control) -> void:
 	if ore_id == "":
 		return
 	_open_inspect_popup(ore_id, mineral_id)
-	accept_event()
+	get_viewport().set_input_as_handled()
 
 
 func _open_inspect_popup(ore_id: String, mineral_id: String) -> void:
