@@ -67,31 +67,13 @@ func _ready() -> void:
 	facing_nose.size = Vector2(10, 10)
 	facing_nose.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(facing_nose)
-	# Sprint 9 B.2: try Kenney atlas sprite first, fall back to ColorRect.
-	# SpriteUtil always creates a child — we only want the Sprite2D path here.
-	# Check if the atlas loads by probing load_atlas_region directly.
-	var player_atlas: AtlasTexture = SpriteUtil.load_atlas_region(
-		AssetPaths.PLAYER_SPRITE["sheet"],
-		AssetPaths.tile_rect(AssetPaths.PLAYER_SPRITE["col"], AssetPaths.PLAYER_SPRITE["row"])
-	)
-	if player_atlas != null:
-		var tex_sprite := Sprite2D.new()
+	# Optional pixel-art sprite: if res://resources/sprites/player/player.png
+	# exists, show it and hide the ColorRect fallback.
+	var tex_sprite: Sprite2D = SpriteUtil.try_load_sprite(TEXTURE_PATH, Vector2(28, 28))
+	if tex_sprite:
 		tex_sprite.name = "BodyTexture"
-		tex_sprite.texture = player_atlas
-		tex_sprite.centered = true
-		# Kenney tiles are 16x16 — scale 2x to land at 32x32 on-screen.
-		tex_sprite.scale = Vector2(2.0, 2.0)
-		# Render above BodySprite ColorRect + the facing_nose so the character reads.
-		tex_sprite.z_index = 1
 		add_child(tex_sprite)
 		body_sprite.visible = false
-	else:
-		# Legacy PNG path (kept for back-compat if someone drops a player.png in).
-		var legacy_sprite: Sprite2D = SpriteUtil.try_load_sprite(TEXTURE_PATH, Vector2(28, 28))
-		if legacy_sprite:
-			legacy_sprite.name = "BodyTexture"
-			add_child(legacy_sprite)
-			body_sprite.visible = false
 	_update_facing_visuals()
 	health_changed.emit(health, max_health, armor, max_armor)
 	# Connect touch signal for reliable mobile mining
