@@ -49,37 +49,6 @@ static func load_atlas_region(sheet_path: String, rect: Rect2) -> AtlasTexture:
 	return atlas
 
 
-static func extract_tile_as_texture(sheet_path: String, rect: Rect2) -> ImageTexture:
-	## Extracts a sub-region from `sheet_path` as a standalone ImageTexture.
-	##
-	## Use this when you need a tile texture that *tiles* correctly in a
-	## TextureRect with STRETCH_TILE — AtlasTexture + STRETCH_TILE stretches
-	## the atlas region across the whole rect instead of tiling it (Godot bug).
-	## An ImageTexture holds only the tile's pixels, so STRETCH_TILE repeats it.
-	##
-	## Returns null if the sheet is missing / fails to load.
-	if sheet_path.is_empty():
-		return null
-	if not ResourceLoader.exists(sheet_path):
-		return null
-	var base_tex: Texture2D = load(sheet_path) as Texture2D
-	if base_tex == null:
-		return null
-	var base_img: Image = base_tex.get_image()
-	if base_img == null:
-		return null
-	# Clamp rect to image bounds just in case; get_region silently returns an
-	# empty image on out-of-bounds reads otherwise.
-	var src_rect := Rect2i(
-		int(rect.position.x), int(rect.position.y),
-		int(rect.size.x), int(rect.size.y)
-	)
-	var region_img: Image = base_img.get_region(src_rect)
-	if region_img == null or region_img.is_empty():
-		return null
-	return ImageTexture.create_from_image(region_img)
-
-
 static func try_sprite_or_colorrect(
 	parent: Node,
 	atlas_info: Dictionary,

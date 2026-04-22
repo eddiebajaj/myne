@@ -57,17 +57,11 @@ func _setup_floor_background() -> void:
 	## entities / player but above the dark ColorRect Background. The ColorRect
 	## stays as a fallback — if the atlas fails to load, the dark color shows
 	## through unchanged.
-	##
-	## Sprint 9 post-playtest: use extract_tile_as_texture (standalone
-	## ImageTexture) instead of AtlasTexture. TextureRect.STRETCH_TILE treats
-	## an AtlasTexture as a single stretched texture, producing "one big brown
-	## rectangle" — extracting the tile as its own ImageTexture lets STRETCH_TILE
-	## repeat the 16×16 pixels correctly across the floor.
-	var floor_tex: ImageTexture = SpriteUtil.extract_tile_as_texture(
+	var floor_atlas: AtlasTexture = SpriteUtil.load_atlas_region(
 		AssetPaths.CAVES_SHEET,
 		AssetPaths.tile_rect(AssetPaths.FLOOR_TILE["col"], AssetPaths.FLOOR_TILE["row"])
 	)
-	if floor_tex == null:
+	if floor_atlas == null:
 		return
 	# Push the fallback Background ColorRect below our textured layer so the
 	# tile texture actually covers it. ColorRect still shows through any gaps
@@ -77,7 +71,7 @@ func _setup_floor_background() -> void:
 		bg_rect.z_index = -20
 	var bg_tex := TextureRect.new()
 	bg_tex.name = "FloorTileBackground"
-	bg_tex.texture = floor_tex
+	bg_tex.texture = floor_atlas
 	bg_tex.stretch_mode = TextureRect.STRETCH_TILE
 	bg_tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	bg_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
