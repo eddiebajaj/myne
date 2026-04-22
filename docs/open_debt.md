@@ -33,6 +33,7 @@ Carried forward each sprint. Items are added when deferred, removed when resolve
 | D28 | Ice/Thunder/Venom on-hit mechanics | Sprint 7 | Medium | Counts stored as bot meta; no runtime hit code consumes them yet |
 | D29 | Market tab conversion | Sprint 8 | Low | Deferred — no Buy flow exists yet. Revisit when Trader NPC or Buy content designed |
 | D30 | Legacy upgraded-bot stat drift | Sprint 8 | Low | Migration collapses `hp_upgrade_level`/`damage_upgrade_level` into `upgrade_level` via max-of-the-two. Stats may shift slightly for bots upgraded in Sprint 5-6 |
+| D33 | Environment art (walls, floor, ores, player sprites) | Sprint 9 | Medium | Kenney + Anokolisa pack exploration fell short — both were hand-placement art, not bitmask autotile, and Pillar B visual results didn't satisfy. Reverted. Needs purpose-built autotile tileset OR a design call to embrace ColorRect/stylized look |
 
 ## Resolved (Sprint 8)
 
